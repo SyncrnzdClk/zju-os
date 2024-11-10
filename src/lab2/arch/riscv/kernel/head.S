@@ -1,6 +1,8 @@
     .extern start_kernel
     .extern _traps
     .extern clock_set_next_event
+    .extern task_init
+    .extern mm_init
     .section .text.init
     .globl _start
 _start:
@@ -28,6 +30,12 @@ _start:
     or t0, t0, t1
     csrw sstatus, t0
 
+    # initialize the memory management
+    call mm_init
+
+    # init the tasks before starting the kernel
+    call task_init
+    
     j start_kernel
     # ------------------
 

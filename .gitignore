@@ -54,3 +54,13 @@ dkms.conf
 .DS_Store
 .vscode-ctags
 !fw_jump.elf
+
+# .vscode
+.vscode
+
+# .gdb_history
+.gdb_history
+
+
+# vmlinux
+vmlinux

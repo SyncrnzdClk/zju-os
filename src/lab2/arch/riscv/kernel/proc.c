@@ -20,6 +20,22 @@ void task_init() {
     // 5. 将 current 和 task[0] 指向 idle
 
     /* YOUR CODE HERE */
+    // mm_init();
+    // allocate a physical page for idle
+    idle = (struct task_struct*)kalloc();
+    
+    // set the state as TASK_RUNNING
+    idle->state = TASK_RUNNING;
+
+    // set the counter and priority
+    idle->counter = idle->priority = 0;
+
+    // set the pid as 0
+    idle->pid = 0;
+
+    // set the current and task[0]
+    current = idle;
+    task[0] = idle;
 
     // 1. 参考 idle 的设置，为 task[1] ~ task[NR_TASKS - 1] 进行初始化
     // 2. 其中每个线程的 state 为 TASK_RUNNING, 此外，counter 和 priority 进行如下赋值：
@@ -30,6 +46,22 @@ void task_init() {
     //     - sp 设置为该线程申请的物理页的高地址
 
     /* YOUR CODE HERE */
+    // initialize all tasks as like idle
+    for (int i = 1; i < NR_TASKS; i++) {
+        struct task_struct* new_task = (struct task_struct*)kalloc();
+        new_task->state = TASK_RUNNING;
+        new_task->pid = i;
+
+        // set counter and priority using rand
+        new_task->counter = 0;
+        new_task->priority = rand() % (PRIORITY_MAX-PRIORITY_MIN+1) + PRIORITY_MIN;
+
+        // set the ra and sp
+        new_task->thread.ra = (uint64_t)__dummy;
+        new_task->thread.sp = (uint64_t)new_task + PGSIZE; // notice new_task is also an address of the struct (the bottom of the PAGE)
+    
+        task[i] = new_task;
+    }
 
     printk("...task_init done!\n");
 }
@@ -71,5 +103,17 @@ void dummy() {
             }
             #endif
         }
+    }
+}
+
+// 外部的处理线程切换的函数，在entry.S中实现
+extern void __switch_to(struct task_struct *prev, struct task_struct *next);
+
+/* 线程切换入口函数 */
+void switch_to(struct task_struct *next) {
+    // check if the current task is the same as the next one using their unique pid
+    if (next->pid != current->pid) {
+        // if they are not the same, call __switch_to
+        __switch_to(current, next);
     }
 }
