@@ -9,7 +9,7 @@ _traps:
     # #error Unimplemented
 
     # 1. save 32 registers and sepc to stack
-    addi sp, sp, -32*8 # x0 is not saved
+    addi sp, sp, -33*8 # x0 is not saved
     sd ra, 0(sp)            
     sd sp, 8(sp)
     sd gp, 16(sp)
