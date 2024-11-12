@@ -10,6 +10,7 @@ struct task_struct *idle;           // idle process
 struct task_struct *current;        // 指向当前运行线程的 task_struct
 struct task_struct *task[NR_TASKS]; // 线程数组，所有的线程都保存在此
 struct task_struct *temp_task;
+static int inited = false;
 
 void task_init() {
   srand(2024);
@@ -70,6 +71,7 @@ void task_init() {
   }
 
   printk("...task_init done!\n");
+  inited = true;
 }
 
 #if TEST_SCHED
@@ -140,7 +142,7 @@ static int get_next_process() {
     int next = 0;
     int counter = 0;
     for (int i = 1; i < NR_TASKS; i++) {
-      if (task[i]->counter > counter) {
+      if (task[i] != NULL && task[i]->counter > counter) {
         counter = task[i]->counter;
         next = i;
       }
@@ -149,9 +151,11 @@ static int get_next_process() {
       return next;
     }
     for (int i = 1; i < NR_TASKS; i++) {
-      task[i]->counter = task[i]->priority;
-      printk("SET [PID = %d PRIORITY = %d COUNTER = %d]\n", task[i]->pid,
-             task[i]->priority, task[i]->counter);
+      if (task[i] != NULL) {
+        task[i]->counter = task[i]->priority;
+        printk("SET [PID = %d PRIORITY = %d COUNTER = %d]\n", task[i]->pid,
+               task[i]->priority, task[i]->counter);
+      }
     }
   }
 }
@@ -162,6 +166,9 @@ void do_timer() {
   // 1. 如果当前线程是 idle 线程或当前线程时间片耗尽则直接进行调度
   // 2. 否则对当前线程的运行剩余时间减 1，若剩余时间仍然大于 0
   // 则直接返回，否则进行调度
+  if (!inited) {
+    return;
+  }
   if (current == idle || current->counter == 0) {
     schedule();
   } else {

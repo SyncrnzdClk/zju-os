@@ -24,7 +24,7 @@ _start:
     # set first time interrupt
     #call clock_set_next_event
     rdtime a0
-    li t0, 10000000
+    li t0, 100000
     add a0, a0, t0
     call sbi_set_timer
     
@@ -33,13 +33,13 @@ _start:
     li t1, 1 << 1
     or t0, t0, t1
     csrw sstatus, t0
-
+    
     # initialize the memory management
     call mm_init
 
     # init the tasks before starting the kernel
     call task_init
-    
+
     j start_kernel
     # ------------------
 
