@@ -2,7 +2,7 @@
 #include "stdint.h"
 
 // QEMU 中时钟的频率是 10MHz，也就是 1 秒钟相当于 10000000 个时钟周期
-uint64_t TIMECLOCK = 10000000;
+uint64_t TIMECLOCK = 100000;
 
 uint64_t get_cycles() {
   uint64_t cycles;
@@ -19,6 +19,7 @@ uint64_t get_cycles() {
 void clock_set_next_event() {
   // 下一次时钟中断的时间点
   uint64_t next = get_cycles() + TIMECLOCK;
+  // printk("next time interrupt at: %d\n", next);
 
   // 使用 sbi_set_timer 来完成对下一次时钟中断的设置
   sbi_set_timer(next);

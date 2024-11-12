@@ -22,7 +22,11 @@ _start:
     csrw sie, t0
 
     # set first time interrupt
-    call clock_set_next_event
+    #call clock_set_next_event
+    rdtime a0
+    li t0, 10000000
+    add a0, a0, t0
+    call sbi_set_timer
     
     # set sstatus[SIE] = 1, SIE is the 1st bit
     csrr t0, sstatus
