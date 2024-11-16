@@ -217,7 +217,13 @@ RISC-V的寄存器根据调用约定被分成caller-saved registers 和 callee-s
 
 == 4.
 
+= *Chpater 3*: 心得体会
+== 遇到的问题
+遇到的主要问题是`mm_init`的调用位置，一开始我把`mm_init`放在设置下一次时钟中断之后调用，但是这样出现的问题是，如果时钟中断的时间间隔太小，那么`mm_init`就会在发生时钟中断的时候仍然没有被运行完，这会出现问题，因为处理时钟中断的逻辑中，会调用到`do_timer`，如果这时候各个线程并没有被分配好的话，就会出现问题。所以需要把`mm_init`和`task_init`放在设置时钟中断之前调用。
+
+== 心得体会
+这个实验带领我们实现了简易的线程调度逻辑，加深了我对课上提到的时间片轮转算法的理解，我认为是一个框架非常完善，内容非常充实的实验。尤其是在考虑`mm_init`的过程中，让我意识到处理中断的过程和内核的运行过程是分割的，这让我对计算机的底层逻辑有了更深刻的理解。
 
 = *Declaration*
 
-_I hereby declare that all the work done in this lab 2 is of our independent effort._
+_We hereby declare that all the work done in this lab 2 is of our independent effort._
