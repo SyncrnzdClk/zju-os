@@ -113,6 +113,17 @@ __switch_to:
     ret
 ```
 
+= *Chapter 2*: 思考题
+== 1.
+RISC-V的寄存器根据调用约定被分成caller-saved registers 和 callee-saved registers。其中caller-saved registers包括 `t0-t6, a0-a7`，而callee-saved registers 包括 `s0-s11, sp, ra`。在线程切换的时候，该线程只需要保存caller-saved registers即可。
+
+== 2.
+`mm_init`这个函数的目的是开辟内存，它是通过调用`kfreerange`来实现的，`kfreerange`中则是循环地调用`kfree`去每次开辟一个`PGSIZE`的空间，将其加入到一个`kmem.freelist`的链表中，表示空闲的能被调用的page。这样在循环结束就把整块内存都分成了多个大小为`PGSIZE`的pages，作为管理内存的基本单元。
+
+更加具体地，`kfree`中先将`addr`向上对齐到整数个`PGSIZE`的大小的位置，然后将这段内存都赋值为0，然后把这块内存用一个`struct run *`去管理，然后加入到`kmem.freelist`的头部。
+
+对于`kalloc`，则是取出`kmem.freelist`中的一块内存，重新赋值为0之后，返回给进程使用。从这个`kmem.freelist`的管理可以看出，当给一个进程分配内存的时候，是从内存地址大的位置开始逐页分配的。
+
 = *Declaration*
 
 _I hereby declare that all the work done in this lab 1 is of my independent effort._
