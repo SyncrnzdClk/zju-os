@@ -76,7 +76,7 @@ for (int i = 1; i < NR_TASKS; i++) {
 === `dummy`与`__dummy`的实现
 本实验中，所有的task（`idle`除外）都运行同一段代码`dummy`。
 
-上面我们提到了，现成第一次调度的时候，需要提供一个特殊的地址`__dummy`，根据实验文档中的设计，我们设计这个函数的代码如下
+上面我们提到了，线程第一次调度的时候，需要提供一个特殊的地址`__dummy`，根据实验文档中的设计，我们设计这个函数的代码如下
 ```yasm
 __dummy:
     la t0, dummy # load the address of dummy into the t0 register
@@ -89,11 +89,17 @@ __dummy:
 
 ```c
 void switch_to(struct task_struct *next) {
-    // check if the current task is the same as the next one using their unique pid
-    if (next->pid != current->pid) {
-        // if they are not the same, call __switch_to
-        __switch_to(current, next);
-    }
+  // check if the current task is the same as the next one using their unique
+  // pid
+  if (next->pid != current->pid) {
+    // if they are not the same, call __switch_to
+    printk("switch to [PID = %d PRIORITY = %d COUNTER = %d]\n", next->pid,
+           next->priority, next->counter);
+    // save the current task to temp_task and switch to the next task
+    temp_task = current;
+    current = next;
+    __switch_to(temp_task, next);
+  }
 }
 ```
 
@@ -112,6 +118,74 @@ __switch_to:
     # restore state from next process
     ret
 ```
+=== 实现调度入口函数
+
+设计 `do_timer` 函数，其在时钟中断处理函数中调用，负责执行调度逻辑。
+
+- 当前线程为 `idle` 或当前线程时间片已耗尽，则直接进行调度；
+- 否则当前线程仍有时间片，将其剩余时间减 1。
+  - 若剩余时间仍然大于 0，则不进行调度直接返回；
+  - 否则当前线程的执行时间结束，进行调度。
+
+根据以上逻辑，实现代码如下：
+
+```c
+void do_timer() {
+  // 1. 如果当前线程是 idle 线程或当前线程时间片耗尽则直接进行调度
+  // 2. 否则对当前线程的运行剩余时间减 1，若剩余时间仍然大于 0
+  // 则直接返回，否则进行调度
+  if (current == idle || current->counter == 0) {
+    schedule();
+  } else {
+    current->counter--;
+    if (current->counter == 0) {
+      schedule();
+    }
+  }
+}
+```
+
+=== 线程调度算法实现
+
+在 `task_init` 函数中，内核为各线程分配了随机的优先级。调度算法每次选择剩余时间片最大的线程执行，若所有线程时间片均已耗尽，则重新将时间片初始化为优先级并再次进行调度。
+
+根据线程调度算法逻辑，编写工具函数 `get_next_task` 获取下一个要执行的线程：
+
+```c
+// 选择下一个要运行的线程
+static int get_next_task() {
+  while (true) {
+    int next = 0; // 下一个要运行的线程
+    int counter = 0; // next 线程的 counter
+    for (int i = 1; i < NR_TASKS; i++) {
+      if (task[i] != NULL && task[i]->counter > counter) {
+        // 选择 counter 最大的线程
+        counter = task[i]->counter;
+        next = i;
+      }
+    }
+    if (counter > 0) { // 找到了 counter > 0 的线程
+      return next;
+    }
+    // 所有线程的时间片都已耗尽
+    for (int i = 1; i < NR_TASKS; i++) {
+      if (task[i] != NULL) {
+        // 重新设置时间片
+        task[i]->counter = task[i]->priority;
+        printk("SET [PID = %d PRIORITY = %d COUNTER = %d]\n", task[i]->pid,
+               task[i]->priority, task[i]->counter);
+      }
+    }
+  }
+}
+```
+
+在 `get_next_task` 函数与 `switch_to` 函数的基础上，实现调度函数 `schedule`：
+
+```c
+void schedule() { switch_to(task[get_next_task()]); }
+```
+
 
 = *Chapter 2*: 思考题
 == 1.
@@ -124,6 +198,26 @@ RISC-V的寄存器根据调用约定被分成caller-saved registers 和 callee-s
 
 对于`kalloc`，则是取出`kmem.freelist`中的一块内存，重新赋值为0之后，返回给进程使用。从这个`kmem.freelist`的管理可以看出，当给一个进程分配内存的时候，是从内存地址大的位置开始逐页分配的。
 
+== 3.
+在之后的线程调度`__switch_to`过程中，`ra`保存的函数返回点即为程序运行到`__switch_to`入口的`PC`值。
+
+完整的线程切换过程如下:
+
+程序刚进入`switch_to`函数时，`ra`的值在下图中可以看到 
+#figure(image("images/01.png"), caption: [进入`switch_to`])
+
+程序继续运行，可以看到当运行到`proc.c`的133行的时候`ra`再次发生变化
+#figure(image("images/02.png"), caption: [运行至133行])
+
+程序继续运行，可以看到当运行到`__switch_to`的入口的时候，`ra`再次发生变化，这时就会把`ra`存入到当前备切换线程的栈中，也就是当前线程的函数返回点。
+#figure(image("images/03.png"), caption: [运行至`__switch_to`入口])
+
+程序继续运行，可以看到当运行到`ld ra, 32(a1)`的时候，`ra`被赋值为了将要切换到的`next`线程的函数返回点。
+#figure(image("images/04.png"), caption: [运行至`ld ra, 32(a1)`入口])
+
+== 4.
+
+
 = *Declaration*
 
-_I hereby declare that all the work done in this lab 1 is of my independent effort._
+_I hereby declare that all the work done in this lab 2 is of our independent effort._

@@ -11,6 +11,12 @@ _start:
     # - your code here -
     la sp, boot_stack_top
 
+    # initialize the memory management
+    call mm_init
+
+    # init the tasks before starting the kernel
+    call task_init
+
     # set stvec = _traps
     la t0, _traps
     csrw stvec, t0
@@ -34,12 +40,6 @@ _start:
     or t0, t0, t1
     csrw sstatus, t0
     
-    # initialize the memory management
-    call mm_init
-
-    # init the tasks before starting the kernel
-    call task_init
-
     j start_kernel
     # ------------------
 

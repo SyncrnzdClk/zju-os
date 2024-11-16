@@ -10,7 +10,6 @@ struct task_struct *idle;           // idle process
 struct task_struct *current;        // 指向当前运行线程的 task_struct
 struct task_struct *task[NR_TASKS]; // 线程数组，所有的线程都保存在此
 struct task_struct *temp_task;
-static int inited = false;
 
 void task_init() {
   srand(2024);
@@ -71,7 +70,6 @@ void task_init() {
   }
 
   printk("...task_init done!\n");
-  inited = true;
 }
 
 #if TEST_SCHED
@@ -131,27 +129,32 @@ void switch_to(struct task_struct *next) {
     // if they are not the same, call __switch_to
     printk("switch to [PID = %d PRIORITY = %d COUNTER = %d]\n", next->pid,
            next->priority, next->counter);
+    // save the current task to temp_task and switch to the next task
     temp_task = current;
     current = next;
     __switch_to(temp_task, next);
   }
 }
 
-static int get_next_process() {
+// 选择下一个要运行的线程
+static int get_next_task() {
   while (true) {
-    int next = 0;
-    int counter = 0;
+    int next = 0; // 下一个要运行的线程
+    int counter = 0; // next 线程的 counter
     for (int i = 1; i < NR_TASKS; i++) {
       if (task[i] != NULL && task[i]->counter > counter) {
+        // 选择 counter 最大的线程
         counter = task[i]->counter;
         next = i;
       }
     }
-    if (counter > 0) {
+    if (counter > 0) { // 找到了 counter > 0 的线程
       return next;
     }
+    // 所有线程的时间片都已耗尽
     for (int i = 1; i < NR_TASKS; i++) {
       if (task[i] != NULL) {
+        // 重新设置时间片
         task[i]->counter = task[i]->priority;
         printk("SET [PID = %d PRIORITY = %d COUNTER = %d]\n", task[i]->pid,
                task[i]->priority, task[i]->counter);
@@ -160,15 +163,12 @@ static int get_next_process() {
   }
 }
 
-void schedule() { switch_to(task[get_next_process()]); }
+void schedule() { switch_to(task[get_next_task()]); }
 
 void do_timer() {
   // 1. 如果当前线程是 idle 线程或当前线程时间片耗尽则直接进行调度
   // 2. 否则对当前线程的运行剩余时间减 1，若剩余时间仍然大于 0
   // 则直接返回，否则进行调度
-  if (!inited) {
-    return;
-  }
   if (current == idle || current->counter == 0) {
     schedule();
   } else {
