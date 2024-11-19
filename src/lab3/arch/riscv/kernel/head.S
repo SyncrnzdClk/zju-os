@@ -3,6 +3,7 @@
     .extern clock_set_next_event
     .extern task_init
     .extern mm_init
+    .extern setup_vm
     .section .text.init
     .globl _start
 _start:
@@ -10,6 +11,12 @@ _start:
     # ------------------
     # - your code here -
     la sp, boot_stack_top
+
+    # call setup_vm
+    call setup_vm
+
+    # call relocate
+    call relocate
 
     # initialize the memory management
     call mm_init
@@ -45,6 +52,30 @@ _start:
 
     .section .bss.stack
     .globl boot_stack
+
+relocate:
+    # set ra = ra + PA2VA_OFFSET
+    # set sp = sp + PA2VA_OFFSET (If you have set the sp before)
+
+    ###################### 
+    #   YOUR CODE HERE   #
+    ######################
+
+    # need a fence to ensure the new translations are in use
+    sfence.vma zero, zero
+
+    # set satp with early_pgtbl
+
+    ###################### 
+    #   YOUR CODE HERE   #
+    ######################
+
+    ret
+
+    .section .bss.stack
+    .globl boot_stack
+
+
 boot_stack:
     .space 4096 # <-- change to your stack size
 
