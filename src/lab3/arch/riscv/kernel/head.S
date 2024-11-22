@@ -6,8 +6,8 @@
     .extern setup_vm
     .section .text.init
     .globl _start
+    .globl relocate
 _start:
-    # #error Unimplemented
     # ------------------
     # - your code here -
     la sp, boot_stack_top
@@ -50,8 +50,6 @@ _start:
     j start_kernel
     # ------------------
 
-    .section .bss.stack
-    .globl boot_stack
 
 relocate:
     # set ra = ra + PA2VA_OFFSET
@@ -60,21 +58,51 @@ relocate:
     ###################### 
     #   YOUR CODE HERE   #
     ######################
+    
+    # load the value PA2VA_OFFSET in a reg
+    lui t0, 0xffdf8
+    slli t0, t0, 16
 
+    # set ra = ra + PA2VA_OFFSET
+    add ra, ra, t0
+    
+    # set sp = sp + PA2VA_OFFSET
+    add sp, sp, t0
+
+    
+    # set satp with early_pgtbl
+    
     # need a fence to ensure the new translations are in use
     sfence.vma zero, zero
-
-    # set satp with early_pgtbl
-
+    
     ###################### 
     #   YOUR CODE HERE   #
     ######################
+    
+    # set mode value
+    li t1, 0x8
+    slli t1, t1, 60
+
+    # set asid value
+    li t2, 0
+    slli t2, t2, 44
+
+
+    # set PPN
+    la t3, early_pgtbl
+    srli t3, t3, 12
+
+    # merge these three values
+    or t3, t3, t2
+    or t3, t3, t1
+
+    # set satp
+    csrw satp, t3
 
     ret
 
     .section .bss.stack
     .globl boot_stack
-
 
 boot_stack:
     .space 4096 # <-- change to your stack size

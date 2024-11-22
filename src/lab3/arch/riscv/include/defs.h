@@ -30,6 +30,6 @@
 #define VM_END (0xffffffff00000000)
 #define VM_SIZE (VM_END - VM_START)
 
-#define PA2VA_OFFSET (VM_START - PHY_START)
+#define PA2VA_OFFSET (VM_START - PHY_START) // 0xffff_ffdf_8000_0000
 
 #endif
