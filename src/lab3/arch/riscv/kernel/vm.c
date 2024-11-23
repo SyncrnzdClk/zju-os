@@ -24,6 +24,4 @@ void setup_vm() {
     index = (VM_START >> 30) & 0x1ff;
     early_pgtbl[index] = ((PHY_START >> 12) << 10) | 0xf;
 
-    // printk("finish set up vm \n");
-
 }
