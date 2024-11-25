@@ -21,6 +21,8 @@ _start:
     # initialize the memory management
     call mm_init
 
+    call setup_vm_final
+
     # init the tasks before starting the kernel
     call task_init
 
