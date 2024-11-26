@@ -72,6 +72,7 @@ void setup_vm_final() {
 
   // set satp with swapper_pg_dir
 
+  // physical address of swapper_pg
   uint64_t swapper_pg_dir_pa = (uint64_t)swapper_pg_dir - PA2VA_OFFSET;
   uint64_t satp =
       ((uint64_t)MODE_SV39 << 60) | ((uint64_t)swapper_pg_dir_pa >> 12);
@@ -83,9 +84,10 @@ void setup_vm_final() {
 }
 
 uint64_t *get_pgtable(uint64_t *pgtbl, uint64_t vpn) {
-  if (pgtbl[vpn] & PRIV_V) {
+  // check if page already exists
+  if (pgtbl[vpn] & PRIV_V) { // exists
     return (uint64_t *)((pgtbl[vpn] & 0x3ffffffffffc00) << 2);
-  } else {
+  } else { // does not exist
     uint64_t *new_pgtbl = kalloc();
     memset(new_pgtbl, 0x0, PGSIZE);
     uint64_t new_pgtbl_pa = (uint64_t)new_pgtbl - PA2VA_OFFSET;
@@ -108,7 +110,7 @@ void create_mapping(uint64_t *pgtbl, uint64_t va, uint64_t pa, uint64_t sz,
    * 可以使用 V bit 来判断页表项是否存在
    **/
   for (int i = 0; i < sz; ++i, va += 0x1000, pa += 0x1000) {
-    // printk("va = %lu, pa = %lu, sz = %lu, perm = %lu\n", va, pa, sz, perm);
+    // virtual page number
     uint64_t vpn0 = (va >> 12) & 0x1ff;
     uint64_t vpn1 = (va >> 21) & 0x1ff;
     uint64_t vpn2 = (va >> 30) & 0x1ff;
@@ -116,7 +118,9 @@ void create_mapping(uint64_t *pgtbl, uint64_t va, uint64_t pa, uint64_t sz,
     uint64_t *pgtbl1 = get_pgtable(pgtbl, vpn2);
     uint64_t *pgtbl0 = get_pgtable(pgtbl1, vpn1);
 
+    // check if page already exists
     if (!(pgtbl0[vpn0] & PRIV_V)) {
+      // write pa and perm
       pgtbl0[vpn0] = perm | ((pa >> 2) & 0x3ffffffffffc00);
     }
   }
