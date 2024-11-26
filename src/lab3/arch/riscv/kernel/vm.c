@@ -1,5 +1,6 @@
 #include "defs.h"
 #include "mm.h"
+#include "printk.h"
 #include "string.h"
 
 /* early_pgtbl: 用于 setup_vm 进行 1GiB 的映射 */
@@ -37,6 +38,8 @@ void setup_vm() {
 #define PRIV_A (1 << 6)
 #define PRIV_D (1 << 7)
 
+#define MODE_SV39 8
+
 void create_mapping(uint64_t *pgtbl, uint64_t va, uint64_t pa, uint64_t sz,
                     uint64_t perm);
 
@@ -69,7 +72,10 @@ void setup_vm_final() {
 
   // set satp with swapper_pg_dir
 
-  asm volatile("csrw satp, %0" ::"r"(swapper_pg_dir));
+  uint64_t swapper_pg_dir_pa = (uint64_t)swapper_pg_dir - PA2VA_OFFSET;
+  uint64_t satp =
+      ((uint64_t)MODE_SV39 << 60) | ((uint64_t)swapper_pg_dir_pa >> 12);
+  asm volatile("csrw satp, %0" ::"r"(satp));
 
   // flush TLB
   asm volatile("sfence.vma zero, zero");
@@ -78,11 +84,12 @@ void setup_vm_final() {
 
 uint64_t *get_pgtable(uint64_t *pgtbl, uint64_t vpn) {
   if (pgtbl[vpn] & PRIV_V) {
-    return (uint64_t *)((pgtbl[vpn] & 0xffffffffffffc000) << 2);
+    return (uint64_t *)((pgtbl[vpn] & 0x3ffffffffffc00) << 2);
   } else {
     uint64_t *new_pgtbl = kalloc();
     memset(new_pgtbl, 0x0, PGSIZE);
-    pgtbl[vpn] = ((uint64_t)new_pgtbl >> 2) | PRIV_V;
+    uint64_t new_pgtbl_pa = (uint64_t)new_pgtbl - PA2VA_OFFSET;
+    pgtbl[vpn] = ((uint64_t)new_pgtbl_pa >> 2) | PRIV_V;
     return new_pgtbl;
   }
 }
@@ -101,6 +108,7 @@ void create_mapping(uint64_t *pgtbl, uint64_t va, uint64_t pa, uint64_t sz,
    * 可以使用 V bit 来判断页表项是否存在
    **/
   for (int i = 0; i < sz; ++i, va += 0x1000, pa += 0x1000) {
+    // printk("va = %lu, pa = %lu, sz = %lu, perm = %lu\n", va, pa, sz, perm);
     uint64_t vpn0 = (va >> 12) & 0x1ff;
     uint64_t vpn1 = (va >> 21) & 0x1ff;
     uint64_t vpn2 = (va >> 30) & 0x1ff;
@@ -109,7 +117,7 @@ void create_mapping(uint64_t *pgtbl, uint64_t va, uint64_t pa, uint64_t sz,
     uint64_t *pgtbl0 = get_pgtable(pgtbl1, vpn1);
 
     if (!(pgtbl0[vpn0] & PRIV_V)) {
-      pgtbl0[vpn0] |= perm | pa >> 2;
+      pgtbl0[vpn0] = perm | ((pa >> 2) & 0x3ffffffffffc00);
     }
   }
 }
