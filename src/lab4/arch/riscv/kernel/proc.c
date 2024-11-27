@@ -3,13 +3,22 @@
 #include "mm.h"
 #include "printk.h"
 #include "stdlib.h"
+#include "string.h"
+#include "vm.h"
 
 extern void __dummy();
+extern uint64_t  swapper_pg_dir[512] __attribute__((__aligned__(0x1000)));
+extern char _sramdisk[];
+extern char _eramdisk[];
 
 struct task_struct *idle;           // idle process
 struct task_struct *current;        // 指向当前运行线程的 task_struct
 struct task_struct *task[NR_TASKS]; // 线程数组，所有的线程都保存在此
 struct task_struct *temp_task;
+
+#define SPP_BIT 8
+#define SPIE_BIT 5
+#define SUM_BIT 18
 
 void task_init() {
   srand(2024);
@@ -66,6 +75,56 @@ void task_init() {
         (uint64_t)new_task + PGSIZE; // notice new_task is also an address of
                                      // the struct (the bottom of the PAGE)
 
+    // set the task's sepc with the value of USER_START
+    new_task->thread.sepc = USER_START;
+
+    uint64_t spp = SPP_BIT << 1;
+    uint64_t spie = SPIE_BIT << 1;
+    uint64_t sum = SUM_BIT << 1;
+    // set the thread's sstatus register
+    // the task can be run only when an interrupt happens. and when the interrupt finishes, the sstatus of the task will set the SIE bit with the value of SPIE bit.
+    __asm__ volatile(
+      "csrr t0, sstatus\n"
+      "or t0, t0, %[spp]\n"
+      "or t0, t0, %[spie]\n"
+      "or t0, t0, %[sum]\n"
+      "mv %[ret_val], t0"
+      : [ret_val] "=r" (new_task->thread.sstatus)
+      : [spp] "r" (spp), [spie] "r" (spie), [sum] "r" (sum)
+      : "memory"
+    );
+    // set the sscratch register with the value of USE_END
+    new_task->thread.sscratch = USER_END;
+
+    // allocate one page for new task's pgd
+    new_task->pgd = alloc_page();
+
+    // copy the swapper_pg_dir into the new task's pgd
+    memcpy(new_task->pgd, swapper_pg_dir, PGSIZE);
+
+    // create a mapping for uapp
+    // first calculate the size of the uapp (ceil division)
+    uint64_t real_size_uapp = (uint64_t)_sramdisk - (uint64_t)_eramdisk;
+    uint64_t size_uapp = real_size_uapp & 0xfff == 0 ? real_size_uapp >> 12 : (real_size_uapp >> 12 + 1);
+
+    // allocate some pages for the uapp
+    char* uapp_space = alloc_pages(size_uapp);
+
+    // copy the content of the uapp into the uapp_space
+    memcpy(uapp_space, _sramdisk, real_size_uapp);
+
+    // then create the address mapping for uapp
+    create_mapping(new_task->pgd, USER_START,
+                    (uint64_t)uapp_space, size_uapp,
+                    PRIV_X | PRIV_R | PRIV_V);
+
+    // allocate one page for the stack of user mode
+    char* stack_umode = alloc_page();
+
+    // add the mapping into the pgd
+    create_mapping(new_task->pgd, PGROUNDDOWN(USER_END-1),
+                    (uint64_t)stack_umode, PGSIZE,
+                    PRIV_W | PRIV_R | PRIV_V);
     task[i] = new_task;
   }
 

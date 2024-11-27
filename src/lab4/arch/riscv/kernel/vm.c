@@ -2,6 +2,7 @@
 #include "mm.h"
 #include "printk.h"
 #include "string.h"
+#include "vm.h"
 
 /* early_pgtbl: 用于 setup_vm 进行 1GiB 的映射 */
 uint64_t early_pgtbl[512] __attribute__((__aligned__(0x1000)));
@@ -29,19 +30,9 @@ void setup_vm() {
   early_pgtbl[index] = ((PHY_START >> 12) << 10) | 0xf;
 }
 
-#define PRIV_V (1 << 0)
-#define PRIV_R (1 << 1)
-#define PRIV_W (1 << 2)
-#define PRIV_X (1 << 3)
-#define PRIV_U (1 << 4)
-#define PRIV_G (1 << 5)
-#define PRIV_A (1 << 6)
-#define PRIV_D (1 << 7)
 
-#define MODE_SV39 8
 
-void create_mapping(uint64_t *pgtbl, uint64_t va, uint64_t pa, uint64_t sz,
-                    uint64_t perm);
+
 
 /* swapper_pg_dir: kernel pagetable 根目录，在 setup_vm_final 进行映射 */
 uint64_t swapper_pg_dir[512] __attribute__((__aligned__(0x1000)));
