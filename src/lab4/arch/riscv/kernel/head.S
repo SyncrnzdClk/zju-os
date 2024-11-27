@@ -4,6 +4,7 @@
     .extern task_init
     .extern mm_init
     .extern setup_vm
+    .extern setup_vm_final
     .section .text.init
     .globl _start
     .globl relocate
