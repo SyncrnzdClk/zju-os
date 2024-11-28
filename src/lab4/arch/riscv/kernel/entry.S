@@ -6,8 +6,17 @@
     .globl _traps
     .global __switch_to 
 _traps:
-    # #error Unimplemented
+    # check if it is in the kernel state
+    csrr t0, sscratch
+    # jump to real trap process if it is in the kernel state, else switch stack
+    beq t0, zero, _traps_real
+    # switch the user stack and the kernel stack
+    csrr t0, sscratch
+    mv t1, sp
+    mv sp, t0
+    csrw sscratch, t1
 
+_traps_real:
     # 1. save 32 registers and sepc to stack
     addi sp, sp, -33*8 # x0 is not saved
     sd ra, 0(sp)            
@@ -44,13 +53,15 @@ _traps:
    
     # save sepc
     csrr t0, sepc      
-    sd t0, 248(sp)     
+    sd t0, 248(sp)    
 
     # 2. call trap_handler
 
     # pass the arguments
     csrr a0, scause
     csrr a1, sepc
+    addi t0, sp, 
+    mv a2, t0
 
     # call trap_handler
     call trap_handler
@@ -103,6 +114,12 @@ _traps:
 __dummy:
     la t0, dummy # load the address of dummy into the t0 register
     csrw sepc, t0
+    
+    # switch the user stack and the kernel stack
+    csrr t0, sscratch
+    mv t1, sp
+    mv sp, t0
+    csrw sscratch, t1
     sret # the program will return to the address of dummy
 
 __switch_to:
@@ -124,6 +141,14 @@ __switch_to:
     sd s9, 120(a0)
     sd s10, 128(a0)
     sd s11, 136(a0)
+    csrr t0, sepc
+    sd t0, 144(a0)
+    csrr t0, sstatus
+    sd t0, 152(a0)
+    csrr t0, sscratch
+    sd t0, 160(a0)
+    csrr t0, satp
+    sd t0, 168(a0)
 
     ld ra, 32(a1)
     ld sp, 40(a1)
@@ -139,9 +164,14 @@ __switch_to:
     ld s9, 120(a1)
     ld s10, 128(a1)
     ld s11, 136(a1)
-    
-
-    # restore state from next process
-
-
+    ld t0, 144(a1)
+    csrw spec, t0
+    ld t0, 152(a1)
+    csrw sstatus, t0
+    ld t0, 160(a1)
+    csrw sscratch, t0
+    ld t0, 168(a1)
+    csrw satp, t0
+    # flush TLB
+    sfence.vma zero, zero
     ret

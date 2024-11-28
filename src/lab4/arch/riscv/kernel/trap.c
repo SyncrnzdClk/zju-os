@@ -4,7 +4,11 @@
 #include "stdint.h"
 extern void clock_set_next_event(void);
 
-void trap_handler(uint64_t scause, uint64_t sepc) {
+struct pt_regs {
+  uint64_t general_regs[31];
+};
+
+void trap_handler(uint64_t scause, uint64_t sepc, struct pt_regs *regs) {
 
   // printk("in trap, the value pf sstatus is %llx \n", csr_read(sstatus));
 
@@ -30,5 +34,4 @@ void trap_handler(uint64_t scause, uint64_t sepc) {
            timer_interrupt);
     // printk("test: 802005a8 >> 63 = %llx\n", 0x802005a8 >> 63);
   }
-  // #error Unimplemented
 }

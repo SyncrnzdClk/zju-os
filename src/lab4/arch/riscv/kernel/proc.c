@@ -102,6 +102,25 @@ void task_init() {
     // copy the swapper_pg_dir into the new task's pgd
     memcpy(new_task->pgd, swapper_pg_dir, PGSIZE);
 
+    // find the PPN of new_task->pgd
+    // check mm.c:8 to mm.c:11
+    uint64_t ppn = ((uint64_t)(new_task->pgd - (uint64_t)PA2VA_OFFSET)-PHY_START) >> 12;
+
+    // set the satp value
+    __asm__ volatile(
+    "li t1, 0x8"
+    "slli t1, t1, 60"
+    "li t2, 0"
+    "slli t2, t2, 44"
+    "la t3, %[ppn]"
+    "or t3, t3, t2"
+    "or t3, t3, t1"
+    "mv [satp], t3"
+      : [satp] "=r" (new_task->thread.satp)
+      : [ppn] "r" (ppn)
+      : "memory"
+    );
+
     // create a mapping for uapp
     // first calculate the size of the uapp (ceil division)
     uint64_t real_size_uapp = (uint64_t)_sramdisk - (uint64_t)_eramdisk;
