@@ -2,6 +2,7 @@
 #include "printk.h"
 #include "proc.h"
 #include "stdint.h"
+#include "syscall.h"
 extern void clock_set_next_event(void);
 
 struct pt_regs {
@@ -29,7 +30,25 @@ void trap_handler(uint64_t scause, uint64_t sepc, struct pt_regs *regs) {
     clock_set_next_event();
     do_timer();
   } else {
-    // 其他 interrupt / exception 可以直接忽略，推荐打印出来供以后调试
+    if (scause == 8) { // environment call from U-mode
+      if (regs->general_regs[16] == 172) { // a7 == SYS_GETPID
+        // save the return value in a0 (now in the kernel mode)
+        regs->general_regs[9] = getpid();
+      }
+      else if (regs->general_regs[16] == 64) { // a7 == 64
+        // save the return value in a0 (now in the kernel mode)
+        regs->general_regs[9] = write(regs->general_regs[9], (char*)regs->general_regs[10], regs->general_regs[11]);
+      }
+
+      // manully add 4 to sepc
+      __asm__ volatile(
+        "csrr t0, sepc\n"
+        "addi t0, t0, 4\n"
+        "csrw sepc, t0\n"
+        :::
+        );
+        return;
+    }
     printk("%llx, %d, %llx, %d\n", scause, interrupt, exception_code,
            timer_interrupt);
     // printk("test: 802005a8 >> 63 = %llx\n", 0x802005a8 >> 63);

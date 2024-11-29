@@ -6,12 +6,11 @@
     .globl _traps
     .global __switch_to 
 _traps:
-    # check if it is in the kernel state
+    # check if it is in the kernel state, now t0 denotes the value of sscratch
     csrr t0, sscratch
     # jump to real trap process if it is in the kernel state, else switch stack
     beq t0, zero, _traps_real
     # switch the user stack and the kernel stack
-    csrr t0, sscratch
     mv t1, sp
     mv sp, t0
     csrw sscratch, t1
@@ -60,8 +59,7 @@ _traps_real:
     # pass the arguments
     csrr a0, scause
     csrr a1, sepc
-    addi t0, sp, 
-    mv a2, t0
+    mv a2, sp
 
     # call trap_handler
     call trap_handler
@@ -108,6 +106,15 @@ _traps_real:
     # reset sp
     addi sp, sp, 33*8
 
+    # just return if it was in the kernel state at first
+    beq t0, zero, __return
+    # switch user stack and kernel stack
+    csrr t0, sscratch
+    mv t1, sp
+    mv sp, t0
+    csrw sscratch, t1
+
+__return:
     # 4. return from trap
     sret
 
@@ -165,7 +172,7 @@ __switch_to:
     ld s10, 128(a1)
     ld s11, 136(a1)
     ld t0, 144(a1)
-    csrw spec, t0
+    csrw sepc, t0
     ld t0, 152(a1)
     csrw sstatus, t0
     ld t0, 160(a1)

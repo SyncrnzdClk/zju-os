@@ -108,14 +108,14 @@ void task_init() {
 
     // set the satp value
     __asm__ volatile(
-    "li t1, 0x8"
-    "slli t1, t1, 60"
-    "li t2, 0"
-    "slli t2, t2, 44"
-    "la t3, %[ppn]"
-    "or t3, t3, t2"
-    "or t3, t3, t1"
-    "mv [satp], t3"
+    "li t1, 0x8\n"
+    "slli t1, t1, 60\n"
+    "li t2, 0\n"
+    "slli t2, t2, 44\n"
+    "la t3, %[ppn]\n"
+    "or t3, t3, t2\n"
+    "or t3, t3, t1\n"
+    "mv %[satp], t3\n"
       : [satp] "=r" (new_task->thread.satp)
       : [ppn] "r" (ppn)
       : "memory"
