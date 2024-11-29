@@ -5,15 +5,14 @@
     .align 2
     .globl _traps
     .global __switch_to 
+    .global _traps_real
+    .global __return
 _traps:
-    # check if it is in the kernel state, now t0 denotes the value of sscratch
-    csrr t0, sscratch
-    # jump to real trap process if it is in the kernel state, else switch stack
-    beq t0, zero, _traps_real
-    # switch the user stack and the kernel stack
-    mv t1, sp
-    mv sp, t0
-    csrw sscratch, t1
+    # switch the stack
+    csrrw sp, sscratch, sp
+    # jump to real trap handling process if it isn't in the kernel state, else switch back the sp
+    bne sp, zero, _traps_real
+    csrrw sp, sscratch, sp
 
 _traps_real:
     # 1. save 32 registers and sepc to stack
@@ -106,13 +105,10 @@ _traps_real:
     # reset sp
     addi sp, sp, 33*8
 
-    # just return if it was in the kernel state at first
-    beq t0, zero, __return
-    # switch user stack and kernel stack
-    csrr t0, sscratch
-    mv t1, sp
-    mv sp, t0
-    csrw sscratch, t1
+    # switch stack
+    csrrw sp, sscratch, sp
+    bne sp, zero, __return
+    csrrw sp, sscratch, sp
 
 __return:
     # 4. return from trap

@@ -104,7 +104,7 @@ void task_init() {
 
     // find the PPN of new_task->pgd
     // check mm.c:8 to mm.c:11
-    uint64_t ppn = ((uint64_t)(new_task->pgd - (uint64_t)PA2VA_OFFSET)-PHY_START) >> 12;
+    uint64_t ppn = ((uint64_t)((uint64_t)(new_task->pgd) - (uint64_t)PA2VA_OFFSET)-PHY_START) >> 12;
 
     // set the satp value
     __asm__ volatile(
@@ -112,7 +112,7 @@ void task_init() {
     "slli t1, t1, 60\n"
     "li t2, 0\n"
     "slli t2, t2, 44\n"
-    "la t3, %[ppn]\n"
+    "mv t3, %[ppn]\n"
     "or t3, t3, t2\n"
     "or t3, t3, t1\n"
     "mv %[satp], t3\n"
