@@ -11,11 +11,12 @@ uint64_t write(uint64_t fd, const char* buf, uint64_t count){
     else {
         printk("fd != 1");
     }
-    // set return value
-    
+    // return the number of characters that have been printed
+    return count;
 }
 
 uint64_t getpid(){
-    current->pid;
+    // return the current task's pid
+    return current->pid;
 }
 
