@@ -156,7 +156,7 @@ uint64_t *get_pgtable(uint64_t *pgtbl, uint64_t vpn) {
 }
 ```
 
-`setup_vm_final` 借助 `create_mapping` 函数将内核的 text 段、rodata 段与 data 段映射到内核的虚拟地址空间中。完成多级页表的建立后，计算得到页表的物理地址，并将其写入 `satp` 中（仍为 SV39 模式），最后刷新 TLB。
+`setup_vm_final` 借助 `create_mapping` 函数将内核的 text 段、rodata 段与 data 段映射到内核的虚拟地址空间中。完成多级页表的建立后，计算得到页表的物理地址，并将其写入 `satp` 中（仍为 Sv39 模式），最后刷新 TLB。
 
 ```c
 /* swapper_pg_dir: kernel pagetable 根目录，在 setup_vm_final 进行映射 */
