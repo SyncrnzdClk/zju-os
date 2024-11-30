@@ -64,7 +64,6 @@ dkms.conf
 
 # vmlinux
 vmlinux
-**/vmlinux.asm
-
+*.asm
 # boot
 boot/
