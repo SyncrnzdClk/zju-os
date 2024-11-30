@@ -26,8 +26,9 @@ void trap_handler(uint64_t scause, uint64_t sepc) {
     do_timer();
   } else {
     // 其他 interrupt / exception 可以直接忽略，推荐打印出来供以后调试
-    printk("%llx, %d, %llx, %d\n", scause, interrupt, exception_code,
-           timer_interrupt);
+    printk("[trap] scause = %lu\n", scause);
+    // printk("%llx, %d, %llx, %d\n", scause, interrupt, exception_code,
+    //        timer_interrupt);
     // printk("test: 802005a8 >> 63 = %llx\n", 0x802005a8 >> 63);
   }
   // #error Unimplemented

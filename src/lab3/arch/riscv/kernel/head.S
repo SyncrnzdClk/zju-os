@@ -50,6 +50,7 @@ _start:
     or t0, t0, t1
     csrw sstatus, t0
     
+    # j _srodata
     j start_kernel
     # ------------------
 
@@ -72,6 +73,10 @@ relocate:
     # set sp = sp + PA2VA_OFFSET
     add sp, sp, t0
 
+    csrr t1, stvec
+    la t1, 1f
+    add t1, t1, t0
+    csrw stvec, t1
     
     # set satp with early_pgtbl
     
@@ -101,7 +106,8 @@ relocate:
 
     # set satp
     csrw satp, t3
-
+.align 2
+1:
     ret
 
     .section .bss.stack
