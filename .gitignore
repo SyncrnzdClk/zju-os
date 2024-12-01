@@ -64,10 +64,8 @@ dkms.conf
 
 # vmlinux
 vmlinux
+*.asm
 **/vmlinux.asm
-
-# pdf
-*.pdf
 
 # boot
 boot/

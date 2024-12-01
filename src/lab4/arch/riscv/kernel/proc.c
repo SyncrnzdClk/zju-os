@@ -104,8 +104,8 @@ void task_init() {
 
     // find the PPN of new_task->pgd
     // check mm.c:8 to mm.c:11
-    uint64_t ppn = ((uint64_t)((uint64_t)(new_task->pgd) - (uint64_t)PA2VA_OFFSET)-PHY_START) >> 12;
-
+    // uint64_t ppn = ((uint64_t)((uint64_t)(new_task->pgd) - (uint64_t)PA2VA_OFFSET)-PHY_START) >> 12;
+    uint64_t ppn = PHYS2PFN(VA2PA((uint64_t)(new_task->pgd)));
     // set the satp value
     __asm__ volatile(
     "li t1, 0x8\n"
@@ -123,8 +123,8 @@ void task_init() {
 
     // create a mapping for uapp
     // first calculate the size of the uapp (ceil division)
-    uint64_t real_size_uapp = (uint64_t)_sramdisk - (uint64_t)_eramdisk;
-    uint64_t size_uapp = real_size_uapp & 0xfff == 0 ? real_size_uapp >> 12 : (real_size_uapp >> 12 + 1);
+    uint64_t real_size_uapp = (uint64_t)_eramdisk - (uint64_t)_sramdisk;
+    uint64_t size_uapp = real_size_uapp & 0xfff == 0 ? real_size_uapp >> 12 : ((uint64_t)(real_size_uapp >> 12) + 1);
 
     // allocate some pages for the uapp
     char* uapp_space = alloc_pages(size_uapp);
@@ -134,15 +134,14 @@ void task_init() {
 
     // then create the address mapping for uapp
     create_mapping(new_task->pgd, USER_START,
-                    (uint64_t)uapp_space, size_uapp,
+                    VA2PA((uint64_t)uapp_space), size_uapp,
                     PRIV_X | PRIV_R | PRIV_V);
-
     // allocate one page for the stack of user mode
     char* stack_umode = alloc_page();
 
     // add the mapping into the pgd
     create_mapping(new_task->pgd, PGROUNDDOWN(USER_END-1),
-                    (uint64_t)stack_umode, PGSIZE,
+                    VA2PA((uint64_t)stack_umode), PGSIZE,
                     PRIV_W | PRIV_R | PRIV_V);
     task[i] = new_task;
   }
