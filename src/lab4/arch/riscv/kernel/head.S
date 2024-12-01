@@ -32,10 +32,10 @@ _start:
     csrw stvec, t0
     
     # set sie[STIE] = 1, STIE is the 5th bit
-    csrr t0, sie
-    li t1, 1 << 5
-    or t0, t0, t1
-    csrw sie, t0
+    # csrr t0, sie
+    # li t1, 1 << 5
+    # or t0, t0, t1
+    # csrw sie, t0
 
     # set first time interrupt
     #call clock_set_next_event
@@ -50,7 +50,6 @@ _start:
     or t0, t0, t1
     csrw sstatus, t0
     
-    # j _srodata
     j start_kernel
     # ------------------
 
@@ -73,10 +72,6 @@ relocate:
     # set sp = sp + PA2VA_OFFSET
     add sp, sp, t0
 
-    csrr t1, stvec
-    la t1, 1f
-    add t1, t1, t0
-    csrw stvec, t1
     
     # set satp with early_pgtbl
     
@@ -106,8 +101,7 @@ relocate:
 
     # set satp
     csrw satp, t3
-.align 2
-1:
+
     ret
 
     .section .bss.stack

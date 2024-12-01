@@ -40,6 +40,15 @@ void setup_vm() {
 }
 ```
 
+建立映射后，`mm_init` 所使用的地址变为虚拟地址，需要改变 `mm_init` 中使用的地址范围。
+
+```c
+void mm_init(void) {
+    kfreerange(_ekernel, (char *)PHY_END + PA2VA_OFFSET);
+    printk("...mm_init done!\n");
+}
+```
+
 == relocate
 我们首先需要将`ra`和`sp`的值移动到后续将要读取的虚拟地址上。`PA2VA_OFFSET`是一个比较大的值，所以这里我们的处理如下。
 ```yasm
@@ -79,6 +88,138 @@ add sp, sp, t0
     csrw satp, t3
 
     ret
+```
+
+== setup_vm_final 的实现
+
+为方便后续程序的编写，预先定义 `setup_vm_final` 中将使用的常量。
+
+```c
+#define PRIV_V (1 << 0)
+#define PRIV_R (1 << 1)
+#define PRIV_W (1 << 2)
+#define PRIV_X (1 << 3)
+#define PRIV_U (1 << 4)
+#define PRIV_G (1 << 5)
+#define PRIV_A (1 << 6)
+#define PRIV_D (1 << 7)
+
+#define MODE_SV39 8
+```
+
+`setup_vm_final` 借助以下函数 `create_mapping` 创建映射关系。`create_mapping` 从需要映射的虚拟地址中取出三级页表的索引，根据索引获取对应的页表，最后将物理地址和权限写入页表项中。
+
+```c
+void create_mapping(uint64_t *pgtbl, uint64_t va, uint64_t pa, uint64_t sz,
+                    uint64_t perm) {
+  /*
+   * pgtbl 为根页表的基地址
+   * va, pa 为需要映射的虚拟地址、物理地址
+   * sz 为映射的大小，单位为字节
+   * perm 为映射的权限（即页表项的低 8 位）
+   *
+   * 创建多级页表的时候可以使用 kalloc() 来获取一页作为页表目录
+   * 可以使用 V bit 来判断页表项是否存在
+   **/
+  for (int i = 0; i < sz; ++i, va += 0x1000, pa += 0x1000) {
+    // virtual page number
+    uint64_t vpn0 = (va >> 12) & 0x1ff;
+    uint64_t vpn1 = (va >> 21) & 0x1ff;
+    uint64_t vpn2 = (va >> 30) & 0x1ff;
+
+    uint64_t *pgtbl1 = get_pgtable(pgtbl, vpn2);
+    uint64_t *pgtbl0 = get_pgtable(pgtbl1, vpn1);
+
+    // check if page already exists
+    if (!(pgtbl0[vpn0] & PRIV_V)) {
+      // write pa and perm
+      pgtbl0[vpn0] = perm | ((pa >> 2) & 0x3ffffffffffc00);
+    }
+  }
+}
+```
+
+其中，`get_pgtable` 函数用于从上级页表中获取下级页表的地址。如果对应的下级页表不存在，则新建一个页表，将其地址转换为物理地址后写入上级页表中。
+
+```c
+uint64_t *get_pgtable(uint64_t *pgtbl, uint64_t vpn) {
+  // check if page already exists
+  if (pgtbl[vpn] & PRIV_V) { // exists
+    return (uint64_t *)((pgtbl[vpn] & 0x3ffffffffffc00) << 2);
+  } else { // does not exist
+    uint64_t *new_pgtbl = kalloc();
+    memset(new_pgtbl, 0x0, PGSIZE);
+    uint64_t new_pgtbl_pa = (uint64_t)new_pgtbl - PA2VA_OFFSET;
+    pgtbl[vpn] = ((uint64_t)new_pgtbl_pa >> 2) | PRIV_V;
+    return new_pgtbl;
+  }
+}
+```
+
+`setup_vm_final` 借助 `create_mapping` 函数将内核的 text 段、rodata 段与 data 段映射到内核的虚拟地址空间中。完成多级页表的建立后，计算得到页表的物理地址，并将其写入 `satp` 中（仍为 Sv39 模式），最后刷新 TLB。
+
+```c
+/* swapper_pg_dir: kernel pagetable 根目录，在 setup_vm_final 进行映射 */
+uint64_t swapper_pg_dir[512] __attribute__((__aligned__(0x1000)));
+
+extern uint64_t _stext, _srodata, _sdata;
+
+void setup_vm_final() {
+  memset(swapper_pg_dir, 0x0, PGSIZE);
+
+  // No OpenSBI mapping required
+
+  // mapping kernel text X|-|R|V
+  uint64_t size_text = ((uint64_t)&_srodata - (uint64_t)&_stext) >> 12;
+  create_mapping(swapper_pg_dir, (uint64_t)&_stext,
+                 (uint64_t)&_stext - PA2VA_OFFSET, size_text,
+                 PRIV_X | PRIV_R | PRIV_V);
+
+  // mapping kernel rodata -|-|R|V
+  uint64_t size_rodata = ((uint64_t)&_sdata - (uint64_t)&_srodata) >> 12;
+  create_mapping(swapper_pg_dir, (uint64_t)&_srodata,
+                 (uint64_t)&_srodata - PA2VA_OFFSET, size_rodata,
+                 PRIV_R | PRIV_V);
+
+  // mapping other memory -|W|R|V
+  create_mapping(swapper_pg_dir, (uint64_t)&_sdata,
+                 (uint64_t)&_sdata - PA2VA_OFFSET,
+                 32768 - size_text - size_rodata, PRIV_W | PRIV_R | PRIV_V);
+
+  // set satp with swapper_pg_dir
+
+  // physical address of swapper_pg
+  uint64_t swapper_pg_dir_pa = (uint64_t)swapper_pg_dir - PA2VA_OFFSET;
+  uint64_t satp =
+      ((uint64_t)MODE_SV39 << 60) | ((uint64_t)swapper_pg_dir_pa >> 12);
+  asm volatile("csrw satp, %0" ::"r"(satp));
+
+  // flush TLB
+  asm volatile("sfence.vma zero, zero");
+  return;
+}
+```
+
+在 `setup_vm_final` 中，我们需要申请页面以建立多级页表，因此在调用前需要先通过 `mm_init` 将内存管理初始化。
+
+```yasm
+_start:
+    # ------------------
+    # - your code here -
+    la sp, boot_stack_top
+
+    # call setup_vm
+    call setup_vm
+
+    # call relocate
+    call relocate
+
+    # initialize the memory management
+    call mm_init
+
+    call setup_vm_final
+
+    # ...
 ```
 
 = *Chapter 2*: 思考题
