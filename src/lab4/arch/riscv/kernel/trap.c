@@ -11,6 +11,7 @@ struct pt_regs {
 
 void trap_handler(uint64_t scause, uint64_t sepc, struct pt_regs *regs) {
 
+  printk("[trap] scause = %lu, a7 = %lu\n", scause, regs->general_regs[16]);
   // printk("in trap, the value pf sstatus is %llx \n", csr_read(sstatus));
 
   // 通过 `scause` 判断 trap 类型

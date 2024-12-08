@@ -75,7 +75,7 @@ void task_init() {
         (uint64_t)new_task + PGSIZE; // notice new_task is also an address of
                                      // the struct (the bottom of the PAGE)
 
-    // set the task's sepc with the value of USER_START
+    // set the task's sepc as the value of USER_START
     new_task->thread.sepc = USER_START;
 
     uint64_t spp = SPP_BIT << 1;
@@ -132,7 +132,7 @@ void task_init() {
 
     // then create the address mapping for uapp
     create_mapping(new_task->pgd, USER_START,
-                    VA2PA((uint64_t)uapp_space), size_uapp,
+                    VA2PA((uint64_t)uapp_space), size_uapp << 12,
                     PRIV_U | PRIV_X | PRIV_R | PRIV_V);
     // allocate one page for the stack of user mode
     char* stack_umode = alloc_page();

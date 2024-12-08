@@ -115,15 +115,15 @@ __return:
     sret
 
 __dummy:
-    la t0, dummy # load the address of dummy into the t0 register
-    csrw sepc, t0
+    # la t0, dummy # load the address of dummy into the t0 register
+    # csrw sepc, t0
     
     # switch the user stack and the kernel stack
     csrr t0, sscratch
     mv t1, sp
     mv sp, t0
     csrw sscratch, t1
-    sret # the program will return to the address of dummy
+    sret # the program will return to User-mode program
 
 __switch_to:
 
