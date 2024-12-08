@@ -223,20 +223,116 @@ _start:
 ```
 
 = *Chapter 2*: 思考题
+== 1. 
+=== `.text`的测试
+可以看到`la t0, _stext`成功读入了`_stext`对应的地址
+#figure(image("images/04.png"))
+可以看到`ld t1, 0(t0)`成功读入了`_stext`处的数据，说明R属性被正确设置了。
+#figure(image("images/05.png"))
+当我们要执行`sd zero, 0(t0)`的时候发现，程序崩溃了，说明W属性确实没有被允许。
+#figure(image("images/06.png"))
+
+=== `.rodata`的测试
+可以看到`la t0, _srodata`成功读入了`_srodata`对应的地址
+#figure(image("images/01.png"))
+可以看到`ld t1, 0(t0)`成功读入了`_srodata`处的数据，说明R属性被正确设置了。
+#figure(image("images/02.png"))
+当我们要执行`sd zero, 0(t0)`的时候发现，程序崩溃了，说明W属性确实没有被允许（置为0）。
+#figure(image("images/03.png"))
+当我们要执行`jalr ra, t0, 0`的时候发现，程序崩溃了，说明X属性确实没有被允许（置为0）。
+#figure(image("images/07.png"))
+#figure(image("images/03.png"))
 == 2.
 === a.
 本次实验中建立等值映射的原因在于，在我们设置`satp`之后，我们的PC仍然在物理地址上，程序此时认为自己处于“虚拟地址”上，就会尝试把当前的地址通过页表查找到“物理地址”，如果不建立等值映射，程序就找不到对应的映射后的地址了。
 
 === b.
+linux的内核启动部分在设置`satp`附近的逻辑如下：
++ 首先设置`sie`和`sip`
++ load全局指针到`gp`中
++ 通过禁用`FPU`来防止
++ 清空`bss`段
++ 执行`setup_vm`来初始化页表
++ 进入`relocate`的代码
++ 先把`ra`中的物理地址改为虚拟地址，这是为了在改变寻址方式之后，返回时能到达正确的地址
++ 将`stvec`修改为设置`satp`后的第一条指令的虚拟地址
++ 计算好`swapper_pg_dir`的值，但是先不写入到`satp`中。
++ 将`trampoline_pg_dir`的值对应的物理页号以及`mode`一起写入到`satp`中，然后此时寻址方式就变成根据虚拟地址来寻址了，但是此时PC仍然在物理地址上，由于没有建立等值映射，所以会触发一个page fault。然后程序会跳转到`stvec`中记录的地址执行代码，而此时该地址恰好是设置`satp`的下一条指令。
++ 重新设置`stvec`
++ 重新把`swapper_pg_dir`和`mode`一起写入到`satp`中。
++ 跳转到`start_kernel`
+
+=== c.
+linux之所以可以不进行等值映射，是因为当我们找不到对应地址时，会触发page fault的中断，而处理中断的程序地址恰好被设置为了设置`satp`之后的下一条指令，所以能恰好继续执行代码。
+
+=== d.
+`trampoline_pg_dir`相当于我们实验中实现的`early_pgtbl`，他不是最终的页表。而`swapper_pg_dir`则是最终被用来转化虚拟地址到物理地址的页表。`trampoline_pg_dir`是在第一次设置完`stvec`之后写入到`satp`中的。然后等到触发了page fault之后，`swapper_pg_dir`才会被写入到`satp`中。
+
+=== e.
+只需要修改`relocate`处的代码如下即可
+```yasm
+relocate:
+    # set ra = ra + PA2VA_OFFSET
+    # set sp = sp + PA2VA_OFFSET (If you have set the sp before)
+
+    ###################### 
+    #   YOUR CODE HERE   #
+    ######################
+    
+    # load the value PA2VA_OFFSET in a reg
+    lui t0, 0xffdf8
+    slli t0, t0, 16
+
+    # set ra = ra + PA2VA_OFFSET
+    add ra, ra, t0
+    
+    # set sp = sp + PA2VA_OFFSET
+    add sp, sp, t0
+
+    csrr t1, stvec
+    la t1, 1f
+    add t1, t1, t0
+    csrw stvec, t1
+    
+    # set satp with early_pgtbl
+    
+    # need a fence to ensure the new translations are in use
+    sfence.vma zero, zero
+    
+    # set mode value
+    li t1, 0x8
+    slli t1, t1, 60
+
+    # set asid value
+    li t2, 0
+    slli t2, t2, 44
+
+
+    # set PPN
+    la t3, early_pgtbl
+    srli t3, t3, 12
+
+    # merge these three values
+    or t3, t3, t2
+    or t3, t3, t1
+
+    # set satp
+    csrw satp, t3
+.align 2
+1:
+    ret
+```
 
 
 = *Chpater 3*: 心得体会
 == 遇到的问题
-
+- 一开始不是很理解代码中的那些符号的地址是怎么对应上的，比如我在设置`satp`之前，`la t3, early_pgtbl`的时候，得到的到底是`early_pgtbl`的物理地址还是虚拟地址？经过gdb的调试和分析，我逐渐理解了，load这个符号的地址实际上是根据和PC的相对距离来做的，这样如果PC在物理地址上，那么load出来的就是物理地址，如果PC在虚拟地址上，那么load出来的就是虚拟地址。本质在当前的PC和这个符号的相对位置，所以无论是通过虚拟地址还是物理地址寻址，都能找到正确的符号的地址。
+#figure(image("images/00.png"))
+- 一开始不明白为什么setup_vm里面需要先设置一个等值映射，后来通过和同学的讨论得知，是避免设置完satp之后PC在物理地址上找不到对应的物理地址的情况。
 
 == 心得体会
-
+这次实验个人认为对于虚拟内存的概念的理解很有帮助，但是实验文档感觉思维略微有点跳跃，有些地方感觉没说清楚，比如为什么要先进行`setup_vm`然后再做`setup_vm_final`？对于第一次做这个实验的同学可能会觉得一头雾水。再比如为什么要先做等值映射？在没有任何提示的情况下，也不知道接下来写入`satp`的过程的时候，看到这个东西更加是十分迷惑。我认为就算要把这个地方作为一个考点，也要在文档里给出相应提示，至少明确指出这个地方是需要同学们思考原因的（结果在最后思考题的部分才指出，这样让读文档的体验感非常不好）。因为这种在第一次看起来比较反常的操作，会影响部分做实验的同学怀疑是自己的理论知识哪里还没看完整，然后又花大量时间去查阅文档，结果一无所获，非常影响实验的体验感。
 
 = *Declaration*
 
-_We hereby declare that all the work done in this lab 2 is of our independent effort._
+_We hereby declare that all the work done in this lab 3 is of our independent effort._
