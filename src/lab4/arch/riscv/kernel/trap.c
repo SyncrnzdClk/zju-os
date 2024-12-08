@@ -7,6 +7,7 @@ extern void clock_set_next_event(void);
 
 struct pt_regs {
   uint64_t general_regs[31];
+  uint64_t sepc;
 };
 
 void trap_handler(uint64_t scause, uint64_t sepc, struct pt_regs *regs) {
@@ -42,12 +43,8 @@ void trap_handler(uint64_t scause, uint64_t sepc, struct pt_regs *regs) {
       }
 
       // manully add 4 to sepc
-      __asm__ volatile(
-        "csrr t0, sepc\n"
-        "addi t0, t0, 4\n"
-        "csrw sepc, t0\n"
-        :::
-        );
+      // note that sepc will be recovered in entry.S (and the value is regs->sepc), so it's useless to just add 4 to csr register sepc.
+      regs->sepc += 4;
         return;
     }
     printk("[trap] scause = %lu\n", scause);
