@@ -79,21 +79,19 @@ void task_init() {
     new_task->thread.sepc = USER_START;
 
     uint64_t spp = SPP_BIT << 1;
-    uint64_t spie = SPIE_BIT << 1;
     uint64_t sum = SUM_BIT << 1;
     // set the thread's sstatus register
     // the task can be run only when an interrupt happens. and when the interrupt finishes, the sstatus of the task will set the SIE bit with the value of SPIE bit.
     __asm__ volatile(
       "csrr t0, sstatus\n"
       "or t0, t0, %[spp]\n"
-      "or t0, t0, %[spie]\n"
       "or t0, t0, %[sum]\n"
       "mv %[ret_val], t0"
       : [ret_val] "=r" (new_task->thread.sstatus)
-      : [spp] "r" (spp), [spie] "r" (spie), [sum] "r" (sum)
+      : [spp] "r" (spp), [sum] "r" (sum)
       : "memory"
     );
-    // set the sscratch register with the value of USE_END
+    // set the sscratch register equal to thread.sp with the value of USER_END
     new_task->thread.sscratch = USER_END;
 
     // allocate one page for new task's pgd
@@ -105,7 +103,7 @@ void task_init() {
     // find the PPN of new_task->pgd
     // check mm.c:8 to mm.c:11
     // uint64_t ppn = ((uint64_t)((uint64_t)(new_task->pgd) - (uint64_t)PA2VA_OFFSET)-PHY_START) >> 12;
-    uint64_t ppn = PHYS2PFN(VA2PA((uint64_t)(new_task->pgd)));
+    uint64_t ppn = VA2PA((uint64_t)(new_task->pgd)) >> 12;
     // set the satp value
     __asm__ volatile(
     "li t1, 0x8\n"
@@ -135,14 +133,14 @@ void task_init() {
     // then create the address mapping for uapp
     create_mapping(new_task->pgd, USER_START,
                     VA2PA((uint64_t)uapp_space), size_uapp,
-                    PRIV_X | PRIV_R | PRIV_V);
+                    PRIV_U | PRIV_X | PRIV_R | PRIV_V);
     // allocate one page for the stack of user mode
     char* stack_umode = alloc_page();
 
     // add the mapping into the pgd
     create_mapping(new_task->pgd, PGROUNDDOWN(USER_END-1),
                     VA2PA((uint64_t)stack_umode), PGSIZE,
-                    PRIV_W | PRIV_R | PRIV_V);
+                    PRIV_U | PRIV_W | PRIV_R | PRIV_V);
     task[i] = new_task;
   }
 

@@ -173,8 +173,8 @@ __switch_to:
     csrw sstatus, t0
     ld t0, 160(a1)
     csrw sscratch, t0
-    ld t0, 168(a1)
-    csrw satp, t0
     # flush TLB
     sfence.vma zero, zero
+    ld t0, 168(a1)
+    csrw satp, t0
     ret

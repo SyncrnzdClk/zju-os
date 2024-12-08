@@ -49,8 +49,6 @@ void trap_handler(uint64_t scause, uint64_t sepc, struct pt_regs *regs) {
         );
         return;
     }
-    printk("%llx, %d, %llx, %d\n", scause, interrupt, exception_code,
-           timer_interrupt);
-    // printk("test: 802005a8 >> 63 = %llx\n", 0x802005a8 >> 63);
+    printk("[trap] scause = %lu\n", scause);
   }
 }

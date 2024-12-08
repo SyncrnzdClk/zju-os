@@ -45,7 +45,7 @@ struct task_struct {
     uint64_t pid;
 
     struct thread_struct thread;
-    uint64_t *pgd;  // 用户态页表
+    uint64_t* pgd;  // 用户态页表
 };
 
 /* 线程初始化，创建 NR_TASKS 个线程 */

@@ -45,13 +45,14 @@ void setup_vm_final() {
   // No OpenSBI mapping required
 
   // mapping kernel text X|-|R|V
-  uint64_t size_text = ((uint64_t)&_srodata - (uint64_t)&_stext) >> 12;
+  uint64_t size_text = ((uint64_t)&_srodata - (uint64_t)&_stext);
   create_mapping(swapper_pg_dir, (uint64_t)&_stext,
                  (uint64_t)&_stext - PA2VA_OFFSET, size_text,
                  PRIV_X | PRIV_R | PRIV_V);
 
   // mapping kernel rodata -|-|R|V
-  uint64_t size_rodata = ((uint64_t)&_sdata - (uint64_t)&_srodata) >> 12;
+  uint64_t size_rodata = ((uint64_t)&_sdata - (uint64_t)&_srodata);
+  
   create_mapping(swapper_pg_dir, (uint64_t)&_srodata,
                  (uint64_t)&_srodata - PA2VA_OFFSET, size_rodata,
                  PRIV_R | PRIV_V);
@@ -59,7 +60,7 @@ void setup_vm_final() {
   // mapping other memory -|W|R|V
   create_mapping(swapper_pg_dir, (uint64_t)&_sdata,
                  (uint64_t)&_sdata - PA2VA_OFFSET,
-                 32768 - size_text - size_rodata, PRIV_W | PRIV_R | PRIV_V);
+                 PHY_END - ((uint64_t)&_sdata - PA2VA_OFFSET), PRIV_W | PRIV_R | PRIV_V);
 
   // set satp with swapper_pg_dir
 
@@ -77,7 +78,7 @@ void setup_vm_final() {
 uint64_t *get_pgtable(uint64_t *pgtbl, uint64_t vpn) {
   // check if page already exists
   if (pgtbl[vpn] & PRIV_V) { // exists
-    return (uint64_t *)((pgtbl[vpn] & 0x3ffffffffffc00) << 2);
+    return (uint64_t *)(((pgtbl[vpn] & 0x3ffffffffffc00) << 2) + PA2VA_OFFSET);
   } else { // does not exist
     uint64_t *new_pgtbl = kalloc();
     memset(new_pgtbl, 0x0, PGSIZE);
@@ -100,7 +101,7 @@ void create_mapping(uint64_t *pgtbl, uint64_t va, uint64_t pa, uint64_t sz,
    * 创建多级页表的时候可以使用 kalloc() 来获取一页作为页表目录
    * 可以使用 V bit 来判断页表项是否存在
    **/
-  for (int i = 0; i < sz; ++i, va += 0x1000, pa += 0x1000) {
+  for (int i = 0; i < (sz >> 12); ++i, va += 0x1000, pa += 0x1000) {
     // virtual page number
     uint64_t vpn0 = (va >> 12) & 0x1ff;
     uint64_t vpn1 = (va >> 21) & 0x1ff;
