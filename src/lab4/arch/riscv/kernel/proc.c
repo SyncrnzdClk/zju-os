@@ -7,7 +7,7 @@
 #include "vm.h"
 
 extern void __dummy();
-extern uint64_t  swapper_pg_dir[512] __attribute__((__aligned__(0x1000)));
+extern uint64_t swapper_pg_dir[512] __attribute__((__aligned__(0x1000)));
 extern char _sramdisk[];
 extern char _eramdisk[];
 
@@ -19,6 +19,8 @@ struct task_struct *temp_task;
 #define SPP_BIT (1 << 8)
 #define SPIE_BIT (1 << 5)
 #define SUM_BIT (1 << 18)
+
+#define SATP_MODE_SV39 ((uint64_t)8)
 
 void task_init() {
   srand(2024);
@@ -78,19 +80,11 @@ void task_init() {
     // set the task's sepc as the value of USER_START
     new_task->thread.sepc = USER_START;
 
-    uint64_t spp = SPP_BIT;
-    uint64_t sum = SUM_BIT;
     // set the thread's sstatus register
-    // the task can be run only when an interrupt happens. and when the interrupt finishes, the sstatus of the task will set the SIE bit with the value of SPIE bit.
-    __asm__ volatile(
-      "csrr t0, sstatus\n"
-      "or t0, t0, %[spp]\n"
-      "or t0, t0, %[sum]\n"
-      "mv %[ret_val], t0"
-      : [ret_val] "=r" (new_task->thread.sstatus)
-      : [spp] "r" (spp), [sum] "r" (sum)
-      : "memory"
-    );
+    // the task can be run only when an interrupt happens. and when the
+    // interrupt finishes, the sstatus of the task will set the SIE bit with the
+    // value of SPIE bit.
+    new_task->thread.sstatus = SPIE_BIT | SUM_BIT;
     // set the sscratch register equal to thread.sp with the value of USER_END
     new_task->thread.sscratch = USER_END;
 
@@ -102,45 +96,33 @@ void task_init() {
 
     // find the PPN of new_task->pgd
     // check mm.c:8 to mm.c:11
-    // uint64_t ppn = ((uint64_t)((uint64_t)(new_task->pgd) - (uint64_t)PA2VA_OFFSET)-PHY_START) >> 12;
+    // uint64_t ppn = ((uint64_t)((uint64_t)(new_task->pgd) -
+    // (uint64_t)PA2VA_OFFSET)-PHY_START) >> 12;
     uint64_t ppn = VA2PA((uint64_t)(new_task->pgd)) >> 12;
     // set the satp value
-    __asm__ volatile(
-    "li t1, 0x8\n"
-    "slli t1, t1, 60\n"
-    "li t2, 0\n"
-    "slli t2, t2, 44\n"
-    "mv t3, %[ppn]\n"
-    "or t3, t3, t2\n"
-    "or t3, t3, t1\n"
-    "mv %[satp], t3\n"
-      : [satp] "=r" (new_task->thread.satp)
-      : [ppn] "r" (ppn)
-      : "memory"
-    );
+    new_task->thread.satp = ppn | (SATP_MODE_SV39 << 60);
 
     // create a mapping for uapp
     // first calculate the size of the uapp (ceil division)
     uint64_t real_size_uapp = (uint64_t)_eramdisk - (uint64_t)_sramdisk;
-    uint64_t size_uapp = real_size_uapp & 0xfff == 0 ? real_size_uapp >> 12 : ((uint64_t)(real_size_uapp >> 12) + 1);
+    uint64_t size_uapp = (real_size_uapp + 0xfff) >> 12;
 
     // allocate some pages for the uapp
-    char* uapp_space = alloc_pages(size_uapp);
+    char *uapp_space = alloc_pages(size_uapp);
 
     // copy the content of the uapp into the uapp_space
     memcpy(uapp_space, _sramdisk, real_size_uapp);
 
     // then create the address mapping for uapp
-    create_mapping(new_task->pgd, USER_START,
-                    VA2PA((uint64_t)uapp_space), size_uapp << 12,
-                    PRIV_U | PRIV_W | PRIV_X | PRIV_R | PRIV_V);
+    create_mapping(new_task->pgd, USER_START, VA2PA((uint64_t)uapp_space),
+                   size_uapp << 12, PRIV_U | PRIV_W | PRIV_X | PRIV_R | PRIV_V);
     // allocate one page for the stack of user mode
-    char* stack_umode = alloc_page();
+    char *stack_umode = alloc_page();
 
     // add the mapping into the pgd
-    create_mapping(new_task->pgd, PGROUNDDOWN(USER_END-1),
-                    VA2PA((uint64_t)stack_umode), PGSIZE,
-                    PRIV_U | PRIV_W | PRIV_R | PRIV_V);
+    create_mapping(new_task->pgd, PGROUNDDOWN(USER_END - 1),
+                   VA2PA((uint64_t)stack_umode), PGSIZE,
+                   PRIV_U | PRIV_W | PRIV_R | PRIV_V);
     task[i] = new_task;
   }
 
@@ -214,7 +196,7 @@ void switch_to(struct task_struct *next) {
 // 选择下一个要运行的线程
 static int get_next_task() {
   while (true) {
-    int next = 0; // 下一个要运行的线程
+    int next = 0;    // 下一个要运行的线程
     int counter = 0; // next 线程的 counter
     for (int i = 1; i < NR_TASKS; i++) {
       if (task[i] != NULL && task[i]->counter > counter) {

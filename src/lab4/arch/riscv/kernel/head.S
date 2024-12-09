@@ -32,10 +32,10 @@ _start:
     csrw stvec, t0
     
     # set sie[STIE] = 1, STIE is the 5th bit
-    # csrr t0, sie
-    # li t1, 1 << 5
-    # or t0, t0, t1
-    # csrw sie, t0
+    csrr t0, sie
+    li t1, 1 << 5
+    or t0, t0, t1
+    csrw sie, t0
 
     # set first time interrupt
     # call clock_set_next_event

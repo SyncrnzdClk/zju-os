@@ -8,15 +8,14 @@
     .global _traps_real
     .global __return
 _traps:
-    # switch the stack
+    # jump to real trap handling process if it is in the kernel state, else switch the sp
+    csrr t0, sstatus
+    andi t0, t0, 0x100
+    bne t0, zero, _traps_real
     csrrw sp, sscratch, sp
-    # jump to real trap handling process if it isn't in the kernel state, else switch back the sp
-    bne sp, zero, _traps_real
-    csrrw sp, sscratch, sp
-
 _traps_real:
     # 1. save 32 registers and sepc to stack
-    addi sp, sp, -33*8 # x0 is not saved
+    addi sp, sp, -36*8 # x0 is not saved
     sd ra, 0(sp)            
     sd sp, 8(sp)
     sd gp, 16(sp)
@@ -52,6 +51,10 @@ _traps_real:
     # save sepc
     csrr t0, sepc      
     sd t0, 248(sp)    
+    csrr t0, sstatus
+    sd t0, 256(sp)
+    csrr t0, sscratch
+    sd t0, 264(sp)
 
     # 2. call trap_handler
 
@@ -65,6 +68,10 @@ _traps_real:
     
     # 3. restore sepc and 32 registers (x2(sp) should be restore last) from stack
     
+    ld t0, 264(sp)
+    csrw sscratch, t0
+    ld t0, 256(sp)
+    csrw sstatus, t0
     # first restore sepc
     ld t0, 248(sp)
     csrw sepc, t0
@@ -103,15 +110,20 @@ _traps_real:
     ld sp, 8(sp)
 
     # reset sp
-    addi sp, sp, 33*8
+    addi sp, sp, 36*8
 
+    #addi sp, sp, -8
+    #sd t0, 0(sp)
+    csrr t0, sstatus
+    andi t0, t0, 0x100
     # switch stack
-    csrrw sp, sscratch, sp
-    bne sp, zero, __return
+    bne t0, zero, __return
     csrrw sp, sscratch, sp
 
 __return:
     # 4. return from trap
+    #ld t0, 0(sp)
+    #addi sp, sp, 8
     sret
 
 __dummy:
@@ -119,10 +131,11 @@ __dummy:
     # csrw sepc, t0
     
     # switch the user stack and the kernel stack
-    csrr t0, sscratch
-    mv t1, sp
-    mv sp, t0
-    csrw sscratch, t1
+    csrrw sp, sscratch, sp
+    #csrr t0, sscratch
+    #mv t1, sp
+    #mv sp, t0
+    #csrw sscratch, t1
     sret # the program will return to User-mode program
 
 __switch_to:
@@ -173,8 +186,8 @@ __switch_to:
     csrw sstatus, t0
     ld t0, 160(a1)
     csrw sscratch, t0
-    # flush TLB
-    sfence.vma zero, zero
     ld t0, 168(a1)
     csrw satp, t0
+    # flush TLB
+    sfence.vma zero, zero
     ret
