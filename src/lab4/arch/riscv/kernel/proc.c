@@ -78,8 +78,8 @@ void task_init() {
     // set the task's sepc as the value of USER_START
     new_task->thread.sepc = USER_START;
 
-    uint64_t spp = SPP_BIT << 1;
-    uint64_t sum = SUM_BIT << 1;
+    uint64_t spp = 0x1 << SPP_BIT;
+    uint64_t sum = 0x1 << SUM_BIT ;
     // set the thread's sstatus register
     // the task can be run only when an interrupt happens. and when the interrupt finishes, the sstatus of the task will set the SIE bit with the value of SPIE bit.
     __asm__ volatile(
@@ -133,7 +133,7 @@ void task_init() {
     // then create the address mapping for uapp
     create_mapping(new_task->pgd, USER_START,
                     VA2PA((uint64_t)uapp_space), size_uapp << 12,
-                    PRIV_U | PRIV_X | PRIV_R | PRIV_V);
+                    PRIV_U | PRIV_W | PRIV_X | PRIV_R | PRIV_V);
     // allocate one page for the stack of user mode
     char* stack_umode = alloc_page();
 

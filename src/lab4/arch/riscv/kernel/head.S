@@ -38,15 +38,19 @@ _start:
     # csrw sie, t0
 
     # set first time interrupt
-    call clock_set_next_event
+    # call clock_set_next_event
     rdtime a0
     li t0, 100000
     add a0, a0, t0
-    # call sbi_set_timer
+    call sbi_set_timer
     
     # set sstatus[SIE] = 1, SIE is the 1st bit
     csrr t0, sstatus
     li t1, 1 << 1
+    or t0, t0, t1
+
+    # set sstatus[SUM] = 1
+    li t1, 1 << 18
     or t0, t0, t1
     csrw sstatus, t0
     

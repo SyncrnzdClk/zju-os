@@ -47,6 +47,6 @@ void trap_handler(uint64_t scause, uint64_t sepc, struct pt_regs *regs) {
       regs->sepc += 4;
         return;
     }
-    printk("[trap] scause = %lu\n", scause);
+    // printk("[trap] scause = %lu\n", scause);
   }
 }
