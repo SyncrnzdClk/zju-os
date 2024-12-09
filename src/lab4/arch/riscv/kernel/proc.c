@@ -1,5 +1,6 @@
 #include "proc.h"
 #include "defs.h"
+#include "elf.h"
 #include "mm.h"
 #include "printk.h"
 #include "stdlib.h"
@@ -21,6 +22,42 @@ struct task_struct *temp_task;
 #define SUM_BIT (1 << 18)
 
 #define SATP_MODE_SV39 ((uint64_t)8)
+
+static void load_bin(struct task_struct *new_task) {
+  // create a mapping for uapp
+  // first calculate the size of the uapp (ceil division)
+  uint64_t real_size_uapp = (uint64_t)_eramdisk - (uint64_t)_sramdisk;
+  uint64_t size_uapp = (real_size_uapp + PGSIZE - 1) / PGSIZE;
+
+  // allocate some pages for the uapp
+  char *uapp_space = alloc_pages(size_uapp);
+
+  // copy the content of the uapp into the uapp_space
+  memcpy(uapp_space, _sramdisk, real_size_uapp);
+
+  // then create the address mapping for uapp
+  create_mapping(new_task->pgd, USER_START, VA2PA((uint64_t)uapp_space),
+                 size_uapp << 12, PRIV_U | PRIV_W | PRIV_X | PRIV_R | PRIV_V);
+}
+
+static void load_elf(struct task_struct *new_task) {
+  Elf64_Ehdr *elf_header = (Elf64_Ehdr *)_sramdisk;
+  Elf64_Phdr *program_header_start =
+      (Elf64_Phdr *)(_sramdisk + elf_header->e_phoff);
+  for (int i = 0; i < elf_header->e_phnum; ++i) {
+    Elf64_Phdr *program_header = program_header_start + i;
+    if (program_header->p_type == PT_LOAD) {
+      uint64_t shift = program_header->p_vaddr % PGSIZE;
+      uint64_t pages = (shift + program_header->p_memsz + PGSIZE - 1) / PGSIZE;
+      char *uapp_space = alloc_pages(pages);
+      memcpy(uapp_space + shift, _sramdisk + program_header->p_offset,
+             program_header->p_memsz);
+      create_mapping(new_task->pgd, PGROUNDDOWN(program_header->p_vaddr),
+                     VA2PA((uint64_t)uapp_space), pages << 12,
+                     PRIV_U | PRIV_W | PRIV_X | PRIV_R | PRIV_V);
+    }
+  }
+}
 
 void task_init() {
   srand(2024);
@@ -77,8 +114,10 @@ void task_init() {
         (uint64_t)new_task + PGSIZE; // notice new_task is also an address of
                                      // the struct (the bottom of the PAGE)
 
+    Elf64_Ehdr *elf_header = (Elf64_Ehdr *)_sramdisk;
     // set the task's sepc as the value of USER_START
-    new_task->thread.sepc = USER_START;
+    // new_task->thread.sepc = USER_START;
+    new_task->thread.sepc = elf_header->e_entry;
 
     // set the thread's sstatus register
     // the task can be run only when an interrupt happens. and when the
@@ -102,20 +141,8 @@ void task_init() {
     // set the satp value
     new_task->thread.satp = ppn | (SATP_MODE_SV39 << 60);
 
-    // create a mapping for uapp
-    // first calculate the size of the uapp (ceil division)
-    uint64_t real_size_uapp = (uint64_t)_eramdisk - (uint64_t)_sramdisk;
-    uint64_t size_uapp = (real_size_uapp + 0xfff) >> 12;
+    load_elf(new_task);
 
-    // allocate some pages for the uapp
-    char *uapp_space = alloc_pages(size_uapp);
-
-    // copy the content of the uapp into the uapp_space
-    memcpy(uapp_space, _sramdisk, real_size_uapp);
-
-    // then create the address mapping for uapp
-    create_mapping(new_task->pgd, USER_START, VA2PA((uint64_t)uapp_space),
-                   size_uapp << 12, PRIV_U | PRIV_W | PRIV_X | PRIV_R | PRIV_V);
     // allocate one page for the stack of user mode
     char *stack_umode = alloc_page();
 
@@ -123,6 +150,7 @@ void task_init() {
     create_mapping(new_task->pgd, PGROUNDDOWN(USER_END - 1),
                    VA2PA((uint64_t)stack_umode), PGSIZE,
                    PRIV_U | PRIV_W | PRIV_R | PRIV_V);
+
     task[i] = new_task;
   }
 
