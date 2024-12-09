@@ -16,9 +16,9 @@ struct task_struct *current;        // 指向当前运行线程的 task_struct
 struct task_struct *task[NR_TASKS]; // 线程数组，所有的线程都保存在此
 struct task_struct *temp_task;
 
-#define SPP_BIT 8
-#define SPIE_BIT 5
-#define SUM_BIT 18
+#define SPP_BIT (1 << 8)
+#define SPIE_BIT (1 << 5)
+#define SUM_BIT (1 << 18)
 
 void task_init() {
   srand(2024);
@@ -78,8 +78,8 @@ void task_init() {
     // set the task's sepc as the value of USER_START
     new_task->thread.sepc = USER_START;
 
-    uint64_t spp = 0x1 << SPP_BIT;
-    uint64_t sum = 0x1 << SUM_BIT ;
+    uint64_t spp = SPP_BIT;
+    uint64_t sum = SUM_BIT;
     // set the thread's sstatus register
     // the task can be run only when an interrupt happens. and when the interrupt finishes, the sstatus of the task will set the SIE bit with the value of SPIE bit.
     __asm__ volatile(
