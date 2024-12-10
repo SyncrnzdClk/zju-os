@@ -72,3 +72,6 @@ boot/
 
 # gdb script
 *.gdb
+
+**/.cache
+**/compile_commands.json
