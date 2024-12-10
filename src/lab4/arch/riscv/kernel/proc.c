@@ -56,10 +56,14 @@ static void load_elf(struct task_struct *new_task) {
       char *uapp_space = alloc_pages(pages);
       memcpy(uapp_space + shift, _sramdisk + program_header->p_offset,
              program_header->p_memsz);
+      uint64_t priv = program_header->p_flags;
+      uint64_t priv_r = priv & PF_R ? PRIV_R : 0;
+      uint64_t priv_w = priv & PF_W ? PRIV_W : 0;
+      uint64_t priv_x = priv & PF_X ? PRIV_X : 0;
       // create the address mapping for uapp
       create_mapping(new_task->pgd, PGROUNDDOWN(program_header->p_vaddr),
                      VA2PA((uint64_t)uapp_space), pages << 12,
-                     PRIV_U | PRIV_W | PRIV_X | PRIV_R | PRIV_V);
+                     PRIV_U | priv_w | priv_x | priv_r | PRIV_V);
     }
   }
 }
