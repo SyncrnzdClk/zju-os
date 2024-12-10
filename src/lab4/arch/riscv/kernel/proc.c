@@ -42,16 +42,21 @@ static void load_bin(struct task_struct *new_task) {
 
 static void load_elf(struct task_struct *new_task) {
   Elf64_Ehdr *elf_header = (Elf64_Ehdr *)_sramdisk;
+  // find the program header
   Elf64_Phdr *program_header_start =
       (Elf64_Phdr *)(_sramdisk + elf_header->e_phoff);
   for (int i = 0; i < elf_header->e_phnum; ++i) {
+    // enumerate all the program headers
     Elf64_Phdr *program_header = program_header_start + i;
-    if (program_header->p_type == PT_LOAD) {
+    if (program_header->p_type == PT_LOAD) { // loadable
+      // align the vaddr to the page size
       uint64_t shift = program_header->p_vaddr % PGSIZE;
       uint64_t pages = (shift + program_header->p_memsz + PGSIZE - 1) / PGSIZE;
+      // allocate pages for the uapp
       char *uapp_space = alloc_pages(pages);
       memcpy(uapp_space + shift, _sramdisk + program_header->p_offset,
              program_header->p_memsz);
+      // create the address mapping for uapp
       create_mapping(new_task->pgd, PGROUNDDOWN(program_header->p_vaddr),
                      VA2PA((uint64_t)uapp_space), pages << 12,
                      PRIV_U | PRIV_W | PRIV_X | PRIV_R | PRIV_V);
