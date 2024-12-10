@@ -123,7 +123,7 @@ void task_init() {
     // the task can be run only when an interrupt happens. and when the
     // interrupt finishes, the sstatus of the task will set the SIE bit with the
     // value of SPIE bit.
-    new_task->thread.sstatus = SPIE_BIT | SUM_BIT;
+    new_task->thread.sstatus = SUM_BIT;
     // set the sscratch register equal to thread.sp with the value of USER_END
     new_task->thread.sscratch = USER_END;
 
