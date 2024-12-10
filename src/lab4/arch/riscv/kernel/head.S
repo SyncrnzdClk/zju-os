@@ -45,9 +45,9 @@ _start:
     call sbi_set_timer
     
     # set sstatus[SIE] = 1, SIE is the 1st bit
-    csrr t0, sstatus
-    li t1, 1 << 1
-    or t0, t0, t1
+    #csrr t0, sstatus
+    #li t1, 1 << 1
+    #or t0, t0, t1
 
     # set sstatus[SUM] = 1
     li t1, 1 << 18
