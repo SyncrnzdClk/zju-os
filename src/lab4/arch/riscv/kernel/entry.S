@@ -9,8 +9,7 @@
     .global __return
 _traps:
     # jump to real trap handling process if it is in the kernel state, else switch the sp
-    csrr t0, sstatus
-    andi t0, t0, 0x100
+    csrrw sp, sscratch, sp
     bne t0, zero, _traps_real
     csrrw sp, sscratch, sp
 _traps_real:
@@ -112,18 +111,13 @@ _traps_real:
     # reset sp
     addi sp, sp, 36*8
 
-    #addi sp, sp, -8
-    #sd t0, 0(sp)
-    csrr t0, sstatus
-    andi t0, t0, 0x100
     # switch stack
-    bne t0, zero, __return
+    csrrw sp, sscratch, sp
+    bne sp, zero, __return
     csrrw sp, sscratch, sp
 
 __return:
     # 4. return from trap
-    #ld t0, 0(sp)
-    #addi sp, sp, 8
     sret
 
 __dummy:
