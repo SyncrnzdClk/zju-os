@@ -10,7 +10,7 @@
 _traps:
     # jump to real trap handling process if it is in the kernel state, else switch the sp
     csrrw sp, sscratch, sp
-    bne t0, zero, _traps_real
+    bne sp, zero, _traps_real
     csrrw sp, sscratch, sp
 _traps_real:
     # 1. save 32 registers and sepc to stack
