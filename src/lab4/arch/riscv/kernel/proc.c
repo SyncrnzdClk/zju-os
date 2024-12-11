@@ -120,7 +120,8 @@ void task_init() {
                                      // the struct (the bottom of the PAGE)
 
     Elf64_Ehdr *elf_header = (Elf64_Ehdr *)_sramdisk;
-    // set the task's sepc as the value of USER_START
+    // loading binary: set the task's sepc as the value of USER_START
+    // loading elf file: set the task's sepc as the value of elf_header->e_entry
     // new_task->thread.sepc = USER_START;
     new_task->thread.sepc = elf_header->e_entry;
 
