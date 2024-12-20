@@ -49,6 +49,11 @@ static void load_elf(struct task_struct *new_task) {
     // enumerate all the program headers
     Elf64_Phdr *program_header = program_header_start + i;
     if (program_header->p_type == PT_LOAD) { // loadable
+      Log("[0x%lx, 0x%lx) offset: 0x%lx, filesz: 0x%lx, memsz: 0x%lx",
+          program_header->p_vaddr,
+          program_header->p_vaddr + program_header->p_memsz,
+          program_header->p_offset, program_header->p_filesz,
+          program_header->p_memsz);
       // align the vaddr to the page size
       uint64_t shift = program_header->p_vaddr % PGSIZE;
       uint64_t pages = (shift + program_header->p_memsz + PGSIZE - 1) / PGSIZE;
@@ -114,6 +119,7 @@ void task_init() {
   /* YOUR CODE HERE */
   // initialize all tasks as like idle
   for (int i = 1; i < NR_TASKS; i++) {
+    Log("task %d", i);
     struct task_struct *new_task = (struct task_struct *)kalloc();
     new_task->mm.mmap = NULL;
     new_task->state = TASK_RUNNING;
@@ -294,6 +300,8 @@ struct vm_area_struct *find_vma(struct mm_struct *mm, uint64_t addr) {
 
 uint64_t do_mmap(struct mm_struct *mm, uint64_t addr, uint64_t len,
                  uint64_t vm_pgoff, uint64_t vm_filesz, uint64_t flags) {
+  Log("mmap [0x%lx, 0x%lx), pgoff = 0x%lx, filesz = 0x%lx, flags = 0x%lx", addr,
+      addr + len, vm_pgoff, vm_filesz, flags);
   struct vm_area_struct *vma = mm->mmap;
   struct vm_area_struct *node = (struct vm_area_struct *)kalloc();
   *node = (struct vm_area_struct){

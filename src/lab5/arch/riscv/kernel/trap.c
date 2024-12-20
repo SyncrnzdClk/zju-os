@@ -51,9 +51,10 @@ void do_page_fault(struct pt_regs *regs) {
     uint64_t offset = bad_addr - vma->vm_start;
     uint64_t program_page =
         PGROUNDDOWN((uint64_t)_sramdisk + vma->vm_pgoff + offset);
+    Log("vm_start = 0x%lx, vm_pgoff = 0x%lx, offset = 0x%lx, program_page = "
+        "0x%lx",
+        vma->vm_start, vma->vm_pgoff, offset, program_page);
     memcpy(page, (void *)program_page, PGSIZE);
-    create_mapping(current->pgd, PGROUNDDOWN(bad_addr), VA2PA((uint64_t)page),
-                   PGSIZE, priv_r | priv_w | priv_x | PRIV_V);
   }
 }
 
@@ -79,6 +80,7 @@ void trap_handler(uint64_t scause, uint64_t sepc, struct pt_regs *regs) {
     clock_set_next_event();
     do_timer();
   } else {
+    Log("trap: scause = %ld, sepc = 0x%lx", scause, sepc);
     if (scause == 8) {                     // environment call from U-mode
       if (regs->general_regs[16] == 172) { // a7 == SYS_GETPID
         // save the return value in a0 (now in the kernel mode)
