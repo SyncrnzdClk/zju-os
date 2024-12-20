@@ -31,21 +31,36 @@
 //   struct thread_struct thread;
 // };
 
+struct vm_area_struct {
+  struct mm_struct *vm_mm;
+  uint64_t vm_start;
+  uint64_t vm_end;
+  struct vm_area_struct *vm_next, *vm_prev;
+  uint64_t vm_flags;
+  uint64_t vm_pgoff;
+  uint64_t vm_filesz;
+};
+
+struct mm_struct {
+  struct vm_area_struct *mmap;
+};
+
 struct thread_struct {
-    uint64_t ra;
-    uint64_t sp;                     
-    uint64_t s[12];
-    uint64_t sepc, sstatus, sscratch, satp; // satp is personally added
+  uint64_t ra;
+  uint64_t sp;
+  uint64_t s[12];
+  uint64_t sepc, sstatus, sscratch, satp; // satp is personally added
 };
 
 struct task_struct {
-    uint64_t state;
-    uint64_t counter;
-    uint64_t priority;
-    uint64_t pid;
+  uint64_t state;
+  uint64_t counter;
+  uint64_t priority;
+  uint64_t pid;
 
-    struct thread_struct thread;
-    uint64_t* pgd;  // 用户态页表
+  struct thread_struct thread;
+  uint64_t *pgd; // 用户态页表
+  struct mm_struct mm;
 };
 
 /* 线程初始化，创建 NR_TASKS 个线程 */
@@ -63,4 +78,26 @@ void switch_to(struct task_struct *next);
 /* dummy funciton: 一个循环程序，循环输出自己的 pid 以及一个自增的局部变量 */
 void dummy();
 
+/**
+ * @param mm   current thread's mm_struct
+ * @param addr the va to look up
+ *
+ * @return the VMA if found or NULL if not found
+ */
+struct vm_area_struct *find_vma(struct mm_struct *mm, uint64_t addr);
+
+/**
+ * @param mm        current thread's mm_struct
+ * @param addr      the va to map
+ * @param len       memory size to map
+ * @param vm_pgoff  phdr->p_offset
+ * @param vm_filesz phdr->p_filesz
+ * @param flags     flags for the new VMA
+ *
+ * @return start va
+ */
+uint64_t do_mmap(struct mm_struct *mm, uint64_t addr, uint64_t len,
+                 uint64_t vm_pgoff, uint64_t vm_filesz, uint64_t flags);
+
+extern struct task_struct *current;
 #endif

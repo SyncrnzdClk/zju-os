@@ -1,8 +1,8 @@
+#include "vm.h"
 #include "defs.h"
 #include "mm.h"
 #include "printk.h"
 #include "string.h"
-#include "vm.h"
 
 /* early_pgtbl: 用于 setup_vm 进行 1GiB 的映射 */
 uint64_t early_pgtbl[512] __attribute__((__aligned__(0x1000)));
@@ -30,10 +30,6 @@ void setup_vm() {
   early_pgtbl[index] = ((PHY_START >> 12) << 10) | 0xf;
 }
 
-
-
-
-
 /* swapper_pg_dir: kernel pagetable 根目录，在 setup_vm_final 进行映射 */
 uint64_t swapper_pg_dir[512] __attribute__((__aligned__(0x1000)));
 
@@ -52,15 +48,15 @@ void setup_vm_final() {
 
   // mapping kernel rodata -|-|R|V
   uint64_t size_rodata = ((uint64_t)&_sdata - (uint64_t)&_srodata);
-  
+
   create_mapping(swapper_pg_dir, (uint64_t)&_srodata,
                  (uint64_t)&_srodata - PA2VA_OFFSET, size_rodata,
                  PRIV_R | PRIV_V);
 
   // mapping other memory -|W|R|V
-  create_mapping(swapper_pg_dir, (uint64_t)&_sdata,
-                 (uint64_t)&_sdata - PA2VA_OFFSET,
-                 PHY_END - ((uint64_t)&_sdata - PA2VA_OFFSET), PRIV_W | PRIV_R | PRIV_V);
+  create_mapping(
+      swapper_pg_dir, (uint64_t)&_sdata, (uint64_t)&_sdata - PA2VA_OFFSET,
+      PHY_END - ((uint64_t)&_sdata - PA2VA_OFFSET), PRIV_W | PRIV_R | PRIV_V);
 
   // set satp with swapper_pg_dir
 
@@ -92,6 +88,8 @@ uint64_t *get_pgtable(uint64_t *pgtbl, uint64_t vpn) {
 /* 不要修改该接口的参数和返回值 */
 void create_mapping(uint64_t *pgtbl, uint64_t va, uint64_t pa, uint64_t sz,
                     uint64_t perm) {
+  Log("mapping [0x%lx, 0x%lx) to [0x%lx, 0x%lx), perm = 0x%lx", va, va + sz, pa,
+      pa + sz, perm);
   /*
    * pgtbl 为根页表的基地址
    * va, pa 为需要映射的虚拟地址、物理地址

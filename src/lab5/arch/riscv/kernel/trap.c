@@ -1,14 +1,61 @@
 #include "defs.h"
+#include "mm.h"
 #include "printk.h"
 #include "proc.h"
 #include "stdint.h"
+#include "string.h"
 #include "syscall.h"
+#include "vm.h"
 extern void clock_set_next_event(void);
 
 struct pt_regs {
   uint64_t general_regs[31];
   uint64_t sepc, sstatus, sscratch;
 };
+
+#define INST_PAGE_FAULT 12
+#define LOAD_PAGE_FAULT 13
+#define STORE_PAGE_FAULT 15
+
+extern char _sramdisk[];
+extern char _eramdisk[];
+void do_page_fault(struct pt_regs *regs) {
+  uint64_t bad_addr = csr_read(stval);
+  Log("page fault at 0x%lx", bad_addr);
+  struct vm_area_struct *vma = find_vma(&current->mm, bad_addr);
+  if (vma == NULL) {
+    Err("page fault at 0x%lx, but cannot find the vma\n", bad_addr);
+    return;
+  }
+  uint64_t scause = csr_read(scause);
+  if (scause == INST_PAGE_FAULT && (vma->vm_flags & VM_EXEC) == 0) {
+    Err("instruction page fault at 0x%lx, but the vma is not executable\n",
+        bad_addr);
+    return;
+  } else if (scause == LOAD_PAGE_FAULT && (vma->vm_flags & VM_READ) == 0) {
+    Err("load page fault at 0x%lx, but the vma is not readable\n", bad_addr);
+    return;
+  } else if (scause == STORE_PAGE_FAULT && (vma->vm_flags & VM_WRITE) == 0) {
+    Err("store page fault at 0x%lx, but the vma is not writable\n", bad_addr);
+    return;
+  }
+  uint64_t *page = alloc_page();
+  uint64_t priv_r = (vma->vm_flags & VM_READ) ? PRIV_R : 0;
+  uint64_t priv_w = (vma->vm_flags & VM_WRITE) ? PRIV_W : 0;
+  uint64_t priv_x = (vma->vm_flags & VM_EXEC) ? PRIV_X : 0;
+  create_mapping(current->pgd, PGROUNDDOWN(bad_addr), VA2PA((uint64_t)page),
+                 PGSIZE, PRIV_U | priv_r | priv_w | priv_x | PRIV_V);
+  if ((vma->vm_flags & VM_ANON) == 0) {
+    // bad_addr - vma->vm_start is the offset
+    // copy the content of the file to the page
+    uint64_t offset = bad_addr - vma->vm_start;
+    uint64_t program_page =
+        PGROUNDDOWN((uint64_t)_sramdisk + vma->vm_pgoff + offset);
+    memcpy(page, (void *)program_page, PGSIZE);
+    create_mapping(current->pgd, PGROUNDDOWN(bad_addr), VA2PA((uint64_t)page),
+                   PGSIZE, priv_r | priv_w | priv_x | PRIV_V);
+  }
+}
 
 void trap_handler(uint64_t scause, uint64_t sepc, struct pt_regs *regs) {
 
@@ -48,7 +95,12 @@ void trap_handler(uint64_t scause, uint64_t sepc, struct pt_regs *regs) {
       // regs->sepc), so it's useless to just add 4 to csr register sepc.
       regs->sepc += 4;
       return;
+    } else if (scause == INST_PAGE_FAULT || scause == LOAD_PAGE_FAULT ||
+               scause == STORE_PAGE_FAULT) {
+      do_page_fault(regs);
+    } else {
+      Err("unhandled trap: scause = %lu, sepc = 0x%lx, stval = 0x%lx\n", scause,
+          sepc, csr_read(stval));
     }
-    // printk("[trap] scause = %lu\n", scause);
   }
 }

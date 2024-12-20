@@ -53,17 +53,23 @@ static void load_elf(struct task_struct *new_task) {
       uint64_t shift = program_header->p_vaddr % PGSIZE;
       uint64_t pages = (shift + program_header->p_memsz + PGSIZE - 1) / PGSIZE;
       // allocate pages for the uapp
-      char *uapp_space = alloc_pages(pages);
-      memcpy(uapp_space + shift, _sramdisk + program_header->p_offset,
-             program_header->p_memsz);
+      // char *uapp_space = alloc_pages(pages);
+      // memcpy(uapp_space + shift, _sramdisk + program_header->p_offset,
+      //        program_header->p_memsz);
       uint64_t priv = program_header->p_flags;
-      uint64_t priv_r = priv & PF_R ? PRIV_R : 0;
-      uint64_t priv_w = priv & PF_W ? PRIV_W : 0;
-      uint64_t priv_x = priv & PF_X ? PRIV_X : 0;
+      // uint64_t priv_r = priv & PF_R ? PRIV_R : 0;
+      // uint64_t priv_w = priv & PF_W ? PRIV_W : 0;
+      // uint64_t priv_x = priv & PF_X ? PRIV_X : 0;
       // create the address mapping for uapp
-      create_mapping(new_task->pgd, PGROUNDDOWN(program_header->p_vaddr),
-                     VA2PA((uint64_t)uapp_space), pages << 12,
-                     PRIV_U | priv_w | priv_x | priv_r | PRIV_V);
+      // create_mapping(new_task->pgd, PGROUNDDOWN(program_header->p_vaddr),
+      //                VA2PA((uint64_t)uapp_space), pages << 12,
+      //                PRIV_U | priv_w | priv_x | priv_r | PRIV_V);
+      uint64_t priv_r = priv & PF_R ? VM_READ : 0;
+      uint64_t priv_w = priv & PF_W ? VM_WRITE : 0;
+      uint64_t priv_x = priv & PF_X ? VM_EXEC : 0;
+      do_mmap(&new_task->mm, program_header->p_vaddr, program_header->p_memsz,
+              program_header->p_offset, program_header->p_filesz,
+              priv_r | priv_w | priv_x);
     }
   }
 }
@@ -109,6 +115,7 @@ void task_init() {
   // initialize all tasks as like idle
   for (int i = 1; i < NR_TASKS; i++) {
     struct task_struct *new_task = (struct task_struct *)kalloc();
+    new_task->mm.mmap = NULL;
     new_task->state = TASK_RUNNING;
     new_task->pid = i;
 
@@ -154,12 +161,14 @@ void task_init() {
     load_elf(new_task);
 
     // allocate one page for the stack of user mode
-    char *stack_umode = alloc_page();
+    // char *stack_umode = alloc_page();
 
     // add the mapping into the pgd
-    create_mapping(new_task->pgd, PGROUNDDOWN(USER_END - 1),
-                   VA2PA((uint64_t)stack_umode), PGSIZE,
-                   PRIV_U | PRIV_W | PRIV_R | PRIV_V);
+    // create_mapping(new_task->pgd, PGROUNDDOWN(USER_END - 1),
+    //                VA2PA((uint64_t)stack_umode), PGSIZE,
+    //                PRIV_U | PRIV_W | PRIV_R | PRIV_V);
+    do_mmap(&new_task->mm, USER_END - PGSIZE, PGSIZE, 0, 0,
+            VM_READ | VM_WRITE | VM_ANON);
 
     task[i] = new_task;
   }
@@ -272,4 +281,34 @@ void do_timer() {
       schedule();
     }
   }
+}
+
+struct vm_area_struct *find_vma(struct mm_struct *mm, uint64_t addr) {
+  for (struct vm_area_struct *vma = mm->mmap; vma != NULL; vma = vma->vm_next) {
+    if (vma->vm_start <= addr && addr < vma->vm_end) {
+      return vma;
+    }
+  }
+  return NULL;
+}
+
+uint64_t do_mmap(struct mm_struct *mm, uint64_t addr, uint64_t len,
+                 uint64_t vm_pgoff, uint64_t vm_filesz, uint64_t flags) {
+  struct vm_area_struct *vma = mm->mmap;
+  struct vm_area_struct *node = (struct vm_area_struct *)kalloc();
+  *node = (struct vm_area_struct){
+      .vm_mm = mm,
+      .vm_start = addr,
+      .vm_end = addr + len,
+      .vm_next = vma,
+      .vm_prev = NULL,
+      .vm_flags = flags,
+      .vm_pgoff = vm_pgoff,
+      .vm_filesz = vm_filesz,
+  };
+  if (vma != NULL) {
+    vma->vm_prev = node;
+  }
+  mm->mmap = node;
+  return addr;
 }

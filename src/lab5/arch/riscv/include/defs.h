@@ -3,17 +3,17 @@
 
 #include "stdint.h"
 
-#define csr_read(csr)                   \
-  ({                                    \
-    uint64_t __v;                       \
-    asm volatile("csrr %0, " #csr : "=r"(__v) : : "memory"); \
-    __v;                                \
+#define csr_read(csr)                                                          \
+  ({                                                                           \
+    uint64_t __v;                                                              \
+    asm volatile("csrr %0, " #csr : "=r"(__v) : : "memory");                   \
+    __v;                                                                       \
   })
 
-#define csr_write(csr, val)                                    \
-  ({                                                           \
-    uint64_t __v = (uint64_t)(val);                            \
-    asm volatile("csrw " #csr ", %0" : : "r"(__v) : "memory"); \
+#define csr_write(csr, val)                                                    \
+  ({                                                                           \
+    uint64_t __v = (uint64_t)(val);                                            \
+    asm volatile("csrw " #csr ", %0" : : "r"(__v) : "memory");                 \
   })
 
 #define PHY_START 0x0000000080000000
@@ -33,6 +33,24 @@
 #define PA2VA_OFFSET (VM_START - PHY_START) // 0xffff_ffdf_8000_0000
 
 #define USER_START (0x0000000000000000) // user space start virtual address
-#define USER_END (0x0000004000000000) // user space end virtual address
+#define USER_END (0x0000004000000000)   // user space end virtual address
+
+#define Err(format, ...)                                                       \
+  {                                                                            \
+    printk("\33[1;31m[%s,%d,%s] " format "\33[0m\n", __FILE__, __LINE__,       \
+           __func__, ##__VA_ARGS__);                                           \
+    while (1)                                                                  \
+      ;                                                                        \
+  }
+#define Log(format, ...)                                                       \
+  {                                                                            \
+    printk("[%s,%d,%s] " format "\n", __FILE__, __LINE__, __func__,            \
+           ##__VA_ARGS__);                                                     \
+  }
+
+#define VM_ANON 0x1
+#define VM_READ 0x2
+#define VM_WRITE 0x4
+#define VM_EXEC 0x8
 
 #endif
