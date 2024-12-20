@@ -17,6 +17,8 @@ struct pt_regs {
 #define LOAD_PAGE_FAULT 13
 #define STORE_PAGE_FAULT 15
 
+static uint64_t min(uint64_t a, uint64_t b) { return a < b ? a : b; }
+
 extern char _sramdisk[];
 extern char _eramdisk[];
 void do_page_fault(struct pt_regs *regs) {
@@ -51,10 +53,15 @@ void do_page_fault(struct pt_regs *regs) {
     uint64_t offset = bad_addr - vma->vm_start;
     uint64_t program_page =
         PGROUNDDOWN((uint64_t)_sramdisk + vma->vm_pgoff + offset);
-    Log("vm_start = 0x%lx, vm_pgoff = 0x%lx, offset = 0x%lx, program_page = "
-        "0x%lx",
-        vma->vm_start, vma->vm_pgoff, offset, program_page);
+    uint64_t page_end = PGROUNDDOWN(bad_addr) + PGSIZE;
+    Log("vm_start = 0x%lx, vm_pgoff = 0x%lx, offset = 0x%lx, filesz = 0x%lx",
+        vma->vm_start, vma->vm_pgoff, offset, vma->vm_filesz);
     memcpy(page, (void *)program_page, PGSIZE);
+    if (vma->vm_start + vma->vm_filesz < page_end) {
+      uint64_t rest = min(PGSIZE, page_end - vma->vm_start - vma->vm_filesz);
+      Log("zero rest part: 0x%lx", rest);
+      memset(page + PGSIZE - rest, 0, rest);
+    }
   }
 }
 
