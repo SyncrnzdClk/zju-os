@@ -44,8 +44,8 @@
   }
 #define Log(format, ...)                                                       \
   {                                                                            \
-    printk("[%s,%d,%s] " format "\n", __FILE__, __LINE__, __func__,            \
-           ##__VA_ARGS__);                                                     \
+    printk("\33[1;90m[%s,%d,%s] " format "\33[0m\n", __FILE__, __LINE__,       \
+           __func__, ##__VA_ARGS__);                                           \
   }
 
 #define VM_ANON 0x1

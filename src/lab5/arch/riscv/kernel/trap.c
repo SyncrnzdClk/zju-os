@@ -24,19 +24,19 @@ void do_page_fault(struct pt_regs *regs) {
   Log("page fault at 0x%lx", bad_addr);
   struct vm_area_struct *vma = find_vma(&current->mm, bad_addr);
   if (vma == NULL) {
-    Err("page fault at 0x%lx, but cannot find the vma\n", bad_addr);
+    Err("page fault at 0x%lx, but cannot find the vma", bad_addr);
     return;
   }
   uint64_t scause = csr_read(scause);
   if (scause == INST_PAGE_FAULT && (vma->vm_flags & VM_EXEC) == 0) {
-    Err("instruction page fault at 0x%lx, but the vma is not executable\n",
+    Err("instruction page fault at 0x%lx, but the vma is not executable",
         bad_addr);
     return;
   } else if (scause == LOAD_PAGE_FAULT && (vma->vm_flags & VM_READ) == 0) {
-    Err("load page fault at 0x%lx, but the vma is not readable\n", bad_addr);
+    Err("load page fault at 0x%lx, but the vma is not readable", bad_addr);
     return;
   } else if (scause == STORE_PAGE_FAULT && (vma->vm_flags & VM_WRITE) == 0) {
-    Err("store page fault at 0x%lx, but the vma is not writable\n", bad_addr);
+    Err("store page fault at 0x%lx, but the vma is not writable", bad_addr);
     return;
   }
   uint64_t *page = alloc_page();
@@ -99,7 +99,7 @@ void trap_handler(uint64_t scause, uint64_t sepc, struct pt_regs *regs) {
                scause == STORE_PAGE_FAULT) {
       do_page_fault(regs);
     } else {
-      Err("unhandled trap: scause = %lu, sepc = 0x%lx, stval = 0x%lx\n", scause,
+      Err("unhandled trap: scause = %lu, sepc = 0x%lx, stval = 0x%lx", scause,
           sepc, csr_read(stval));
     }
   }
