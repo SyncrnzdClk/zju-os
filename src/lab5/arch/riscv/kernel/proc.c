@@ -8,7 +8,6 @@
 #include "vm.h"
 
 extern void __dummy();
-extern uint64_t swapper_pg_dir[512] __attribute__((__aligned__(0x1000)));
 extern char _sramdisk[];
 extern char _eramdisk[];
 
@@ -22,6 +21,9 @@ struct task_struct *temp_task;
 #define SUM_BIT (1 << 18)
 
 #define SATP_MODE_SV39 ((uint64_t)8)
+
+int nr_tasks = 2; // stack pointer for task[NR_TASKS]
+
 
 static void load_bin(struct task_struct *new_task) {
   // create a mapping for uapp
@@ -118,7 +120,7 @@ void task_init() {
 
   /* YOUR CODE HERE */
   // initialize all tasks as like idle
-  for (int i = 1; i < NR_TASKS; i++) {
+  for (int i = 1; i < nr_tasks; i++) {
     Log("task %d", i);
     struct task_struct *new_task = (struct task_struct *)kalloc();
     new_task->mm.mmap = NULL;
@@ -251,7 +253,7 @@ static int get_next_task() {
   while (true) {
     int next = 0;    // 下一个要运行的线程
     int counter = 0; // next 线程的 counter
-    for (int i = 1; i < NR_TASKS; i++) {
+    for (int i = 1; i < nr_tasks; i++) {
       if (task[i] != NULL && task[i]->counter > counter) {
         // 选择 counter 最大的线程
         counter = task[i]->counter;
@@ -262,7 +264,7 @@ static int get_next_task() {
       return next;
     }
     // 所有线程的时间片都已耗尽
-    for (int i = 1; i < NR_TASKS; i++) {
+    for (int i = 1; i < nr_tasks; i++) {
       if (task[i] != NULL) {
         // 重新设置时间片
         task[i]->counter = task[i]->priority;

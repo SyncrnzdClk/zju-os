@@ -6,7 +6,7 @@
 #if TEST_SCHED
 #define NR_TASKS (1 + 4) // 测试时线程数量
 #else
-#define NR_TASKS (1 + 4) // 用于控制最大线程数量（idle 线程 + 31 内核线程）
+#define NR_TASKS (1 + 8) // 用于控制最大线程数量（idle 线程 + 31 内核线程）
 #endif
 
 #define TASK_RUNNING 0 // 为了简化实验，所有的线程都只有一种状态
@@ -14,6 +14,8 @@
 #define PRIORITY_MIN 1
 #define PRIORITY_MAX 10
 
+
+extern uint64_t swapper_pg_dir[512] __attribute__((__aligned__(0x1000)));
 // /* 线程状态段数据结构 */
 // struct thread_struct {
 //   uint64_t ra;

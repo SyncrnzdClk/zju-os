@@ -8,10 +8,6 @@
 #include "vm.h"
 extern void clock_set_next_event(void);
 
-struct pt_regs {
-  uint64_t general_regs[31];
-  uint64_t sepc, sstatus, sscratch;
-};
 
 #define INST_PAGE_FAULT 12
 #define LOAD_PAGE_FAULT 13
@@ -89,14 +85,16 @@ void trap_handler(uint64_t scause, uint64_t sepc, struct pt_regs *regs) {
   } else {
     Log("trap: scause = %ld, sepc = 0x%lx", scause, sepc);
     if (scause == 8) {                     // environment call from U-mode
-      if (regs->general_regs[16] == 172) { // a7 == SYS_GETPID
+      if (regs->general_regs[16] == SYS_GETPID) { // a7 == SYS_GETPID
         // save the return value in a0 (now in the kernel mode)
         regs->general_regs[9] = getpid();
-      } else if (regs->general_regs[16] == 64) { // a7 == 64
+      } else if (regs->general_regs[16] == SYS_WRITE) { // a7 == 64
         // save the return value in a0 (now in the kernel mode)
         regs->general_regs[9] =
             write(regs->general_regs[9], (char *)regs->general_regs[10],
                   regs->general_regs[11]);
+      } else if(regs->general_regs[16] == SYS_CLONE) {
+        Err("do_fork not implemented");
       }
 
       // manully add 4 to sepc

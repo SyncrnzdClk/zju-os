@@ -64,7 +64,9 @@ _traps_real:
 
     # call trap_handler
     call trap_handler
-    
+
+    .globl __ret_from_fork
+__ret_from_fork:
     # 3. restore sepc and 32 registers (x2(sp) should be restore last) from stack
     
     ld t0, 264(sp)
