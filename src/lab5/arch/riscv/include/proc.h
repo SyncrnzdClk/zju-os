@@ -13,7 +13,7 @@
 
 #define PRIORITY_MIN 1
 #define PRIORITY_MAX 10
-
+#define SATP_MODE_SV39 ((uint64_t)8)
 
 extern uint64_t swapper_pg_dir[512] __attribute__((__aligned__(0x1000)));
 // /* 线程状态段数据结构 */

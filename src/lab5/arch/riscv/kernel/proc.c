@@ -20,7 +20,7 @@ struct task_struct *temp_task;
 #define SPIE_BIT (1 << 5)
 #define SUM_BIT (1 << 18)
 
-#define SATP_MODE_SV39 ((uint64_t)8)
+
 
 int nr_tasks = 2; // stack pointer for task[NR_TASKS]
 

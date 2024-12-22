@@ -1,7 +1,7 @@
 #include "stdio.h"
 #include "syscall.h"
 
-#define WAIT_TIME 0x4FFFFFFF
+#define WAIT_TIME 0x4FFFFFF
 
 static inline long getpid() {
   long ret;

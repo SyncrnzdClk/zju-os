@@ -94,7 +94,8 @@ void trap_handler(uint64_t scause, uint64_t sepc, struct pt_regs *regs) {
             write(regs->general_regs[9], (char *)regs->general_regs[10],
                   regs->general_regs[11]);
       } else if(regs->general_regs[16] == SYS_CLONE) {
-        Err("do_fork not implemented");
+        Log("clone syscall");
+        do_fork(regs);
       }
 
       // manully add 4 to sepc

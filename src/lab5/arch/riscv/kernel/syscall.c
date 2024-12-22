@@ -6,6 +6,7 @@
 extern struct task_struct *task[NR_TASKS];
 extern struct task_struct *current; 
 extern int nr_tasks;
+extern void __ret_from_fork();
 uint64_t write(uint64_t fd, const char* buf, uint64_t count){
     // print buf
     if (fd == 1){
@@ -61,7 +62,7 @@ void check_and_copy_pages(uint64_t *pgd, uint64_t va_start, uint64_t va_end, uin
 uint64_t do_fork(struct pt_regs *regs) {
     // copy kernel stack
     struct task_struct *_task = (struct task_struct *)kalloc();
-    memcpy(_task, current, sizeof(struct task_struct));
+    memcpy(_task, current, PGSIZE);
     // assign new pid
     _task->pid = nr_tasks++;
     // assign new page directory
@@ -79,7 +80,7 @@ uint64_t do_fork(struct pt_regs *regs) {
         memcpy(new_vma, vma, sizeof(struct vm_area_struct));
         // link the new vma to the new task's mm
         new_vma->vm_mm = &(_task->mm);
-        new_vma->vm_next = NULL;
+        new_vma->vm_next = _task->mm.mmap;
         new_vma->vm_prev = NULL;
         // link the new vma to the new task's mm
         if (_task->mm.mmap == NULL) {
@@ -95,10 +96,18 @@ uint64_t do_fork(struct pt_regs *regs) {
         vma = vma->vm_next;
     }
     // get the _task's pt_regs
-    struct pt_regs* child_pt_regs = (struct pt_regs *)((uint64_t)_task + PGSIZE - sizeof(struct pt_regs));
-    _task->thread.sp = (uint64_t)child_pt_regs; // the kernal stack pointer of the child process
-    _task->thread.sscratch = USER_END;
-
+    // struct pt_regs* test_regs = (struct pt_regs *)((uint64_t)current + PGSIZE - sizeof(struct pt_regs));
+    struct pt_regs* child_pt_regs = (struct pt_regs *)((uint64_t)_task + (uint64_t)regs-(uint64_t)current);
+    child_pt_regs->general_regs[1] = (uint64_t)child_pt_regs; // set child_pt_regs->sp 
+    child_pt_regs->sepc += 4; // set the sepc of the child process
+    _task->thread.sscratch = regs->sscratch; // the sscratch of the child process
+    _task->thread.sp = (uint64_t)child_pt_regs; // the sp of the child process
+    _task->thread.ra = (uint64_t)__ret_from_fork; // the ra of the child process
+    // set the return value of the child process
+    child_pt_regs->general_regs[9] = 0;
+    // set the satp of the chlid process
+    uint64_t ppn = VA2PA((uint64_t)(_task->pgd)) >> 12;
+    _task->thread.satp = ppn | (SATP_MODE_SV39 << 60);
     // add _task to the task list
     task[_task->pid] = _task;
     // return the new task's pid
