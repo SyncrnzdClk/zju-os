@@ -7,7 +7,40 @@
 
 struct files_struct *file_init() {
     // todo: alloc pages for files_struct, and initialize stdin, stdout, stderr
+    // alloc pages for file struct 
     struct files_struct *ret = NULL;
+    // calculate the size of files_struct and the pages number it needs
+    uint64_t files_struct_size = sizeof(struct files_struct);
+    uint64_t pages = (files_struct_size + PGSIZE - 1) / PGSIZE;
+    struct files_struct* files_struct_space = (struct files_struct*)alloc_pages(pages);
+    if (files_struct_space == NULL) {
+        printk(RED "Failed to alloc pages for files_struct\n" CLEAR);
+        return NULL;
+    }
+    memset(files_struct_space, 0, files_struct_size);
+    // initialize stdin, stdout, stderr
+    // stdin
+    files_struct_space->fd_array[0].opened = 1;
+    files_struct_space->fd_array[0].perms = FILE_READABLE;
+    files_struct_space->fd_array[0].cfo = 0;
+    files_struct_space->fd_array[0].lseek = NULL;
+    files_struct_space->fd_array[0].write = NULL;
+    files_struct_space->fd_array[0].read = stdin_read;
+    // stdout
+    files_struct_space->fd_array[1].opened = 1;
+    files_struct_space->fd_array[1].perms = FILE_WRITABLE;
+    files_struct_space->fd_array[1].cfo = 0;
+    files_struct_space->fd_array[1].lseek = NULL;
+    files_struct_space->fd_array[1].write = stdout_write;
+    files_struct_space->fd_array[1].read = NULL;
+    // stderr
+    files_struct_space->fd_array[2].opened = 1;
+    files_struct_space->fd_array[2].perms = FILE_WRITABLE;
+    files_struct_space->fd_array[2].cfo = 0;
+    files_struct_space->fd_array[2].lseek = NULL;
+    files_struct_space->fd_array[2].write = stderr_write;
+    files_struct_space->fd_array[2].read = NULL;
+    ret = files_struct_space;
     return ret;
 }
 

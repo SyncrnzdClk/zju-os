@@ -2,11 +2,11 @@
 #define __PROC_H__
 
 #include "stdint.h"
-
+#include "fs.h"
 #if TEST_SCHED
 #define NR_TASKS (1 + 4) // 测试时线程数量
 #else
-#define NR_TASKS (1 + 8) // 用于控制最大线程数量（idle 线程 + 31 内核线程）
+#define NR_TASKS (1 + 1) // 用于控制最大线程数量（idle 线程 + 31 内核线程）
 #endif
 
 #define TASK_RUNNING 0 // 为了简化实验，所有的线程都只有一种状态
@@ -63,6 +63,7 @@ struct task_struct {
   struct thread_struct thread;
   uint64_t *pgd; // 用户态页表
   struct mm_struct mm;
+  struct files_struct *files;
 };
 
 /* 线程初始化，创建 NR_TASKS 个线程 */

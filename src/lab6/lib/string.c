@@ -17,3 +17,22 @@ void *memcpy(void *dst, void *src, uint64_t n) {
     }
     return dst;
 }
+
+uint64_t memcmp(void *s1, void *s2, uint64_t n) {
+    char *c1 = (char *)s1;
+    char *c2 = (char *)s2;
+    for (uint64_t i = 0; i < n; ++i) {
+        if (c1[i] != c2[i]) {
+            return (c1[i] - c2[i]);
+        }
+    }
+    return 0;
+}
+
+uint64_t strlen(const char *s) {
+    uint64_t len = 0;
+    while (s[len] != '\0') {
+        len++;
+    }
+    return len;
+}

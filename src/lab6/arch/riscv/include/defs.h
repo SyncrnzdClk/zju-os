@@ -42,15 +42,29 @@
     while (1)                                                                  \
       ;                                                                        \
   }
-#define Log(format, ...)                                                       \
-  {                                                                            \
-    printk("\33[1;90m[%s,%d,%s] " format "\33[0m\n", __FILE__, __LINE__,       \
-           __func__, ##__VA_ARGS__);                                           \
-  }
+// #define Log(format, ...)                                                       \
+//   {                                                                            \
+//     printk("\33[1;90m[%s,%d,%s] " format "\33[0m\n", __FILE__, __LINE__,       \
+//            __func__, ##__VA_ARGS__);                                           \
+//   }
+
+#if LOG
+#define Log(format, ...) \
+    printk("\33[1;35m[%s,%d,%s] " format "\33[0m\n", \
+        __FILE__, __LINE__, __func__, ## __VA_ARGS__)
+#else
+#define Log(format, ...);
+#endif
 
 #define VM_ANON 0x1
 #define VM_READ 0x2
 #define VM_WRITE 0x4
 #define VM_EXEC 0x8
-
+#define RED "\033[31m"
+#define GREEN "\033[32m"
+#define YELLOW "\033[33m"
+#define BLUE "\033[34m"
+#define PURPLE "\033[35m"
+#define DEEPGREEN "\033[36m"
+#define CLEAR "\033[0m"
 #endif

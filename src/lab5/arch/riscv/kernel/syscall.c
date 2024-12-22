@@ -51,7 +51,7 @@ void check_and_copy_pages(uint64_t *pgd, uint64_t va_start, uint64_t va_end, uin
                     uint64_t priv_x = (vm_flags & VM_EXEC) ? PRIV_X : 0;
                     create_mapping(new_pgd, va, VA2PA((uint64_t)child_process_page), PGSIZE, PRIV_U | priv_r | priv_w | priv_x | PRIV_V);
                     // copy the content of current page to the child page
-                    memcpy(child_process_page, va, PGSIZE);
+                    memcpy(child_process_page, (char *)va, PGSIZE);
                 }
             }
         }

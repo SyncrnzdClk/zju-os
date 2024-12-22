@@ -54,3 +54,10 @@ struct sbiret sbi_set_timer(uint64_t stime_value) {
     uint64_t sbi_set_timer_fid = 0;
     return sbi_ecall(sbi_set_timer_eid, sbi_set_timer_fid, stime_value, 0, 0, 0, 0, 0);
 }
+
+struct sbiret sbi_debug_console_read(uint64_t num_bytes, uint64_t base_addr_lo, uint64_t base_addr_hi) {
+    // set eid and fid
+    uint64_t sbi_debug_console_read_eid = 0x4442434e;
+    uint64_t sbi_debug_console_read_fid = 1;
+    return sbi_ecall(sbi_debug_console_read_eid, sbi_debug_console_read_fid, num_bytes, base_addr_lo, base_addr_hi, 0, 0, 0);
+}

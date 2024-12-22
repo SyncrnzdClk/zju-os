@@ -108,6 +108,9 @@ void task_init() {
   current = idle;
   task[0] = idle;
 
+  // set the file struct for new_task
+  idle->files = file_init();
+
   // 1. 参考 idle 的设置，为 task[1] ~ task[NR_TASKS - 1] 进行初始化
   // 2. 其中每个线程的 state 为 TASK_RUNNING, 此外，counter 和 priority
   // 进行如下赋值：
@@ -177,6 +180,9 @@ void task_init() {
     //                PRIV_U | PRIV_W | PRIV_R | PRIV_V);
     do_mmap(&new_task->mm, USER_END - PGSIZE, PGSIZE, 0, 0,
             VM_READ | VM_WRITE | VM_ANON);
+
+    // set the file struct for new_task
+    new_task->files = file_init();
 
     task[i] = new_task;
   }

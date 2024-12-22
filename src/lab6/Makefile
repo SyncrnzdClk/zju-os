@@ -9,16 +9,17 @@ ISA		:=	rv64imafd
 ABI		:=	lp64
 
 TEST_SCHED  :=  0
-
+LOG     := 1
 INCLUDE	:=	-I $(shell pwd)/include -I $(shell pwd)/arch/riscv/include
 CF		:=	-march=$(ISA) -mabi=$(ABI) -mcmodel=medany -fno-builtin -ffunction-sections -fdata-sections -nostartfiles -nostdlib -nostdinc -static -lgcc -Wl,--nmagic -Wl,--gc-sections -g -fno-pie 
-CFLAG	:=	$(CF) $(INCLUDE) -DTEST_SCHED=$(TEST_SCHED)
+CFLAG	:=	$(CF) $(INCLUDE) -DTEST_SCHED=$(TEST_SCHED) -DLOG=$(LOG)
 
 .PHONY:all run debug clean
 all: clean
 	$(MAKE) -C lib all
 	$(MAKE) -C init all
 	$(MAKE) -C user all
+	$(MAKE) -C fs all
 	$(MAKE) -C arch/riscv all
 	@echo -e '\n'Build Finished OK
 

@@ -51,7 +51,7 @@ void check_and_copy_pages(uint64_t *pgd, uint64_t va_start, uint64_t va_end, uin
                     uint64_t priv_x = (vm_flags & VM_EXEC) ? PRIV_X : 0;
                     create_mapping(new_pgd, va, VA2PA((uint64_t)child_process_page), PGSIZE, PRIV_U | priv_r | priv_w | priv_x | PRIV_V);
                     // copy the content of current page to the child page
-                    memcpy(child_process_page, va, PGSIZE);
+                    memcpy(child_process_page, (char *)va, PGSIZE);
                 }
             }
         }
@@ -112,4 +112,41 @@ uint64_t do_fork(struct pt_regs *regs) {
     task[_task->pid] = _task;
     // return the new task's pid
     return _task->pid;
+}
+
+
+int64_t sys_write(uint64_t fd, const char* buf, uint64_t len){
+    int64_t ret;
+    struct file *file = &(current->files->fd_array[fd]);
+    if (file->opened == 0){
+        printk("file not opened\n");
+        return -1;
+    } else {
+        // check perm and call write function of file
+        // check perm
+        if (!(file->perms & FILE_WRITABLE)) {
+            Err("write into a file that is not writable");
+        }
+        // call write function of file
+        ret = file->write(file, buf, len);
+    }
+    return ret;
+}
+
+int64_t sys_read(uint64_t fd, char* buf, uint64_t len){
+    int64_t ret;
+    struct file *file = &(current->files->fd_array[fd]);
+    if (file->opened == 0){
+        printk("file not opened\n");
+        return -1;
+    } else {
+        // check perm and call read function of file
+        // check perm
+        if (!(file->perms & FILE_READABLE)) {
+            Err("read from a file that is not readable");
+        }
+        // call read function of file
+        ret = file->read(file, buf, len);
+    }
+    return ret;
 }

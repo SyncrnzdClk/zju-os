@@ -91,11 +91,14 @@ void trap_handler(uint64_t scause, uint64_t sepc, struct pt_regs *regs) {
       } else if (regs->general_regs[16] == SYS_WRITE) { // a7 == 64
         // save the return value in a0 (now in the kernel mode)
         regs->general_regs[9] =
-            write(regs->general_regs[9], (char *)regs->general_regs[10],
+            sys_write(regs->general_regs[9], (const char *)regs->general_regs[10],
                   regs->general_regs[11]);
       } else if(regs->general_regs[16] == SYS_CLONE) {
         Log("clone syscall");
         do_fork(regs);
+      } else if(regs->general_regs[16] == SYS_READ) {
+        regs->general_regs[9] =  sys_read(regs->general_regs[9], (char *)regs->general_regs[10], 
+                  regs->general_regs[11]);
       }
 
       // manully add 4 to sepc
