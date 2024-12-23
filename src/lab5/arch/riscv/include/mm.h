@@ -19,8 +19,14 @@ void kfree(void *);
 
 struct buddy {
   uint64_t size;
-  uint64_t *bitmap; 
+  uint64_t *bitmap;
+  uint64_t *ref_cnt; 
 };
+
+uint64_t get_page(void *); // increase ref_cnt
+void put_page(void *); // decrease ref_cnt
+uint64_t get_page_refcnt(void *); // get ref_cnt
+
 
 void buddy_init();
 uint64_t buddy_alloc(uint64_t);

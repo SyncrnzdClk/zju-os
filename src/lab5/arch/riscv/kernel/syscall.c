@@ -43,15 +43,19 @@ void check_and_copy_pages(uint64_t *pgd, uint64_t va_start, uint64_t va_end, uin
                 uint64_t *pgtbl0 = get_pgtable(pgtbl1, vpn1);
                 // check if the third page table entry is valid
                 if (pgtbl0[vpn0] & PRIV_V) {
+                    // icnrease the page count of the referenced page
+                    get_page((void *)va);
+                    // set the PTE_W of the parent process as 0
+                    pgtbl0[vpn0] &= ~PRIV_W;
                     // if yes, deep copy the content of the page
                     // notice only the machine mode has the privilege to access the physical address, so we use memcpy for the virtual page address here
-                    char* child_process_page = alloc_page();
+                    // char* child_process_page = alloc_page();
                     uint64_t priv_r = (vm_flags & VM_READ) ? PRIV_R : 0;
-                    uint64_t priv_w = (vm_flags & VM_WRITE) ? PRIV_W : 0;
+                    // uint64_t priv_w = (vm_flags & VM_WRITE) ? PRIV_W : 0;
                     uint64_t priv_x = (vm_flags & VM_EXEC) ? PRIV_X : 0;
-                    create_mapping(new_pgd, va, VA2PA((uint64_t)child_process_page), PGSIZE, PRIV_U | priv_r | priv_w | priv_x | PRIV_V);
+                    create_mapping(new_pgd, va, (uint64_t)pgtbl0[vpn0]>>10, PGSIZE, PRIV_U | priv_r | priv_x | PRIV_V);
                     // copy the content of current page to the child page
-                    memcpy(child_process_page, (char *)va, PGSIZE);
+                    // memcpy(child_process_page, (char *)va, PGSIZE);
                 }
             }
         }
@@ -95,6 +99,9 @@ uint64_t do_fork(struct pt_regs *regs) {
         // move to the next vma
         vma = vma->vm_next;
     }
+    // flush the TLB
+    asm volatile("sfence.vma zero, zero");
+
     // get the _task's pt_regs
     // struct pt_regs* test_regs = (struct pt_regs *)((uint64_t)current + PGSIZE - sizeof(struct pt_regs));
     struct pt_regs* child_pt_regs = (struct pt_regs *)((uint64_t)_task + (uint64_t)regs-(uint64_t)current);

@@ -22,7 +22,7 @@ void do_page_fault(struct pt_regs *regs) {
   Log("page fault at 0x%lx", bad_addr);
   struct vm_area_struct *vma = find_vma(&current->mm, bad_addr);
   if (vma == NULL) {
-    Err("page fault at 0x%lx, but cannot find the vma", bad_addr);
+    Err("page fault at 0x%lx, but cannot find the vma, current task's pid is %lx", bad_addr, current->pid);
     return;
   }
   uint64_t scause = csr_read(scause);
@@ -37,10 +37,35 @@ void do_page_fault(struct pt_regs *regs) {
     Err("store page fault at 0x%lx, but the vma is not writable", bad_addr);
     return;
   }
-  uint64_t *page = alloc_page();
+
   uint64_t priv_r = (vma->vm_flags & VM_READ) ? PRIV_R : 0;
   uint64_t priv_w = (vma->vm_flags & VM_WRITE) ? PRIV_W : 0;
   uint64_t priv_x = (vma->vm_flags & VM_EXEC) ? PRIV_X : 0;
+
+  // check if it's the cow case first. if yes, copy the page, create a new mapping, and return immediately
+  if (priv_w) {
+    // get the pgtbl entry
+    uint64_t vpn0 = (bad_addr >> 12) & 0x1ff;
+    uint64_t vpn1 = (bad_addr >> 21) & 0x1ff;
+    uint64_t vpn2 = (bad_addr >> 30) & 0x1ff;
+    uint64_t *pgtbl1 = get_pgtable(current->pgd, vpn2);
+    uint64_t *pgtbl0 = get_pgtable(pgtbl1, vpn1);
+    // check if the entry is valid but not writable. if yes, do the cow
+    if ((pgtbl0[vpn0] & PRIV_V) && !(pgtbl0[vpn0] & PRIV_W)) {
+      // create a new page
+      uint64_t *page = alloc_page();
+      // copy the content of the page
+      memcpy(page, PGROUNDDOWN(bad_addr), PGSIZE);
+      // create a new mapping
+      create_mapping(current->pgd, (uint64_t *)PGROUNDDOWN(bad_addr), VA2PA((uint64_t)page),
+                     PGSIZE, PRIV_U | priv_r | priv_w | priv_x | PRIV_V); 
+      Log("cow page fault at 0x%lx, create a new page at 0x%lx", bad_addr, VA2PA((uint64_t)page));
+      return;
+    }
+  }
+
+  uint64_t *page = alloc_page();
+
   create_mapping(current->pgd, PGROUNDDOWN(bad_addr), VA2PA((uint64_t)page),
                  PGSIZE, PRIV_U | priv_r | priv_w | priv_x | PRIV_V);
   if ((vma->vm_flags & VM_ANON) == 0) {
