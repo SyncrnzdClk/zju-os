@@ -1,4 +1,4 @@
-#include "../include/syscall.h"
+#include "syscall.h"
 #include "proc.h"
 #include "mm.h"
 #include "string.h"
@@ -44,7 +44,8 @@ void check_and_copy_pages(uint64_t *pgd, uint64_t va_start, uint64_t va_end, uin
                 // check if the third page table entry is valid
                 if (pgtbl0[vpn0] & PRIV_V) {
                     // icnrease the page count of the referenced page
-                    get_page((void *)va);
+                    uint64_t test =(pgtbl0[vpn0] & ~((1 << 10)-1)) << 2; 
+                    get_page(PA2VA(test));
                     // set the PTE_W of the parent process as 0
                     pgtbl0[vpn0] &= ~PRIV_W;
                     // if yes, deep copy the content of the page
@@ -53,7 +54,7 @@ void check_and_copy_pages(uint64_t *pgd, uint64_t va_start, uint64_t va_end, uin
                     uint64_t priv_r = (vm_flags & VM_READ) ? PRIV_R : 0;
                     // uint64_t priv_w = (vm_flags & VM_WRITE) ? PRIV_W : 0;
                     uint64_t priv_x = (vm_flags & VM_EXEC) ? PRIV_X : 0;
-                    create_mapping(new_pgd, va, (uint64_t)pgtbl0[vpn0]>>10, PGSIZE, PRIV_U | priv_r | priv_x | PRIV_V);
+                    create_mapping(new_pgd, va, (uint64_t)((pgtbl0[vpn0] & ~((1 << 10)-1)) << 2), PGSIZE, PRIV_U | priv_r | priv_x | PRIV_V);
                     // copy the content of current page to the child page
                     // memcpy(child_process_page, (char *)va, PGSIZE);
                 }
@@ -96,6 +97,10 @@ uint64_t do_fork(struct pt_regs *regs) {
         }
         // if the corresponding page table entry exists, copy the content
         check_and_copy_pages(current->pgd, new_vma->vm_start, new_vma->vm_end, _task->pgd, new_vma->vm_flags);
+
+        // flush the TLB
+        asm volatile("sfence.vma zero, zero");
+
         // move to the next vma
         vma = vma->vm_next;
     }

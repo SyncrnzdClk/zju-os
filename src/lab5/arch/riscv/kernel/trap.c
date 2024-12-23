@@ -55,9 +55,14 @@ void do_page_fault(struct pt_regs *regs) {
       // create a new page
       uint64_t *page = alloc_page();
       // copy the content of the page
-      memcpy(page, PGROUNDDOWN(bad_addr), PGSIZE);
+      memcpy(page, (uint64_t *)PGROUNDDOWN(bad_addr), PGSIZE);
+      // decrease the page count
+      uint64_t pa = (pgtbl0[vpn0] & ~((1 << 10) - 1)) << 2;
+      put_page((void *)PA2VA(pa));
+      // before create mapping, set the old page table entry's valid bit as 0
+      pgtbl0[vpn0] &= ~PRIV_V;
       // create a new mapping
-      create_mapping(current->pgd, (uint64_t *)PGROUNDDOWN(bad_addr), VA2PA((uint64_t)page),
+      create_mapping(current->pgd, (uint64_t)PGROUNDDOWN(bad_addr), VA2PA((uint64_t)page),
                      PGSIZE, PRIV_U | priv_r | priv_w | priv_x | PRIV_V); 
       Log("cow page fault at 0x%lx, create a new page at 0x%lx", bad_addr, VA2PA((uint64_t)page));
       return;
@@ -108,7 +113,7 @@ void trap_handler(uint64_t scause, uint64_t sepc, struct pt_regs *regs) {
     clock_set_next_event();
     do_timer();
   } else {
-    Log("trap: scause = %ld, sepc = 0x%lx", scause, sepc);
+    Log("trap: scause = %ld, sepc = 0x%lx, current->pid = %lx", scause, sepc, current->pid);
     if (scause == 8) {                     // environment call from U-mode
       if (regs->general_regs[16] == SYS_GETPID) { // a7 == SYS_GETPID
         // save the return value in a0 (now in the kernel mode)
