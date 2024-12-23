@@ -5,6 +5,8 @@
     .extern mm_init
     .extern setup_vm
     .extern setup_vm_final
+    .extern virtio_dev_init
+    .extern mbr_init
     .section .text.init
     .globl _start
     .globl relocate
@@ -26,6 +28,12 @@ _start:
 
     # init the tasks before starting the kernel
     call task_init
+
+    # init the virtio
+    call virtio_dev_init
+
+    # init mbr
+    call mbr_init
 
     # set stvec = _traps
     la t0, _traps
