@@ -8,7 +8,6 @@
 #include "vm.h"
 extern void clock_set_next_event(void);
 
-
 #define INST_PAGE_FAULT 12
 #define LOAD_PAGE_FAULT 13
 #define STORE_PAGE_FAULT 15
@@ -19,10 +18,12 @@ extern char _sramdisk[];
 extern char _eramdisk[];
 void do_page_fault(struct pt_regs *regs) {
   uint64_t bad_addr = csr_read(stval);
-  Log("page fault at 0x%lx", bad_addr);
+  Log("page fault at 0x%lx, sepc = 0x%lx", bad_addr, regs->sepc);
   struct vm_area_struct *vma = find_vma(&current->mm, bad_addr);
   if (vma == NULL) {
-    Err("page fault at 0x%lx, but cannot find the vma, current task's pid is %lx", bad_addr, current->pid);
+    Err("page fault at 0x%lx, but cannot find the vma, current task's pid is "
+        "%lx",
+        bad_addr, current->pid);
     return;
   }
   uint64_t scause = csr_read(scause);
@@ -42,7 +43,8 @@ void do_page_fault(struct pt_regs *regs) {
   uint64_t priv_w = (vma->vm_flags & VM_WRITE) ? PRIV_W : 0;
   uint64_t priv_x = (vma->vm_flags & VM_EXEC) ? PRIV_X : 0;
 
-  // check if it's the cow case first. if yes, copy the page, create a new mapping, and return immediately
+  // check if it's the cow case first. if yes, copy the page, create a new
+  // mapping, and return immediately
   if (priv_w) {
     // get the pgtbl entry
     uint64_t vpn0 = (bad_addr >> 12) & 0x1ff;
@@ -55,16 +57,19 @@ void do_page_fault(struct pt_regs *regs) {
       // create a new page
       uint64_t *page = alloc_page();
       // copy the content of the page
-      memcpy(page, (uint64_t *)PGROUNDDOWN(bad_addr), PGSIZE);
+      uint64_t pgtbl_res = ((pgtbl0[vpn0] >> 10) << 12);
+      memcpy(page, (uint64_t *)PA2VA(pgtbl_res), PGSIZE);
       // decrease the page count
       uint64_t pa = (pgtbl0[vpn0] & ~((1 << 10) - 1)) << 2;
       put_page((void *)PA2VA(pa));
       // before create mapping, set the old page table entry's valid bit as 0
       pgtbl0[vpn0] &= ~PRIV_V;
       // create a new mapping
-      create_mapping(current->pgd, (uint64_t)PGROUNDDOWN(bad_addr), VA2PA((uint64_t)page),
-                     PGSIZE, PRIV_U | priv_r | priv_w | priv_x | PRIV_V); 
-      Log("cow page fault at 0x%lx, create a new page at 0x%lx", bad_addr, VA2PA((uint64_t)page));
+      create_mapping(current->pgd, (uint64_t)PGROUNDDOWN(bad_addr),
+                     VA2PA((uint64_t)page), PGSIZE,
+                     PRIV_U | priv_r | priv_w | priv_x | PRIV_V);
+      Log("cow page fault at 0x%lx, create a new page at 0x%lx", bad_addr,
+          VA2PA((uint64_t)page));
       return;
     }
   }
@@ -113,8 +118,9 @@ void trap_handler(uint64_t scause, uint64_t sepc, struct pt_regs *regs) {
     clock_set_next_event();
     do_timer();
   } else {
-    Log("trap: scause = %ld, sepc = 0x%lx, current->pid = %lx", scause, sepc, current->pid);
-    if (scause == 8) {                     // environment call from U-mode
+    Log("trap: scause = %ld, sepc = 0x%lx, current->pid = %lx", scause, sepc,
+        current->pid);
+    if (scause == 8) { // environment call from U-mode
       if (regs->general_regs[16] == SYS_GETPID) { // a7 == SYS_GETPID
         // save the return value in a0 (now in the kernel mode)
         regs->general_regs[9] = getpid();
@@ -123,7 +129,7 @@ void trap_handler(uint64_t scause, uint64_t sepc, struct pt_regs *regs) {
         regs->general_regs[9] =
             write(regs->general_regs[9], (char *)regs->general_regs[10],
                   regs->general_regs[11]);
-      } else if(regs->general_regs[16] == SYS_CLONE) {
+      } else if (regs->general_regs[16] == SYS_CLONE) {
         Log("clone syscall");
         do_fork(regs);
       }
