@@ -6,10 +6,8 @@
 #include "vfs.h"
 
 struct files_struct *file_init() {
-  // todo: alloc pages for files_struct, and initialize stdin, stdout, stderr
   // alloc pages for file struct
   struct files_struct *ret = NULL;
-  // calculate the size of files_struct and the pages number it needs
   uint64_t files_struct_size = sizeof(struct files_struct);
   uint64_t pages = (files_struct_size + PGSIZE - 1) / PGSIZE;
   struct files_struct *files_struct_space =
@@ -19,7 +17,6 @@ struct files_struct *file_init() {
     return NULL;
   }
   memset(files_struct_space, 0, files_struct_size);
-  // initialize stdin, stdout, stderr
   // stdin
   files_struct_space->fd_array[0] = (struct file){
       .opened = 1,
