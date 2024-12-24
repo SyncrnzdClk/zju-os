@@ -10,8 +10,8 @@
 
 #show: project.with(
   course: "Operating system",
-  title: "Lab 5",
-  date: "2024/12/24",
+  title: "Lab 2",
+  date: "2024/12/13",
   semester: "Autumn-Fall 2024-2025",
   author: "吴杭 李克成",
 )
