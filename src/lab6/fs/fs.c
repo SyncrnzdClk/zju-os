@@ -7,8 +7,7 @@
 
 struct files_struct *file_init() {
   // alloc pages for ret
-  uint64_t files_struct_size = sizeof(struct files_struct);
-  uint64_t pages = (files_struct_size + PGSIZE - 1) / PGSIZE;
+  uint64_t pages = (sizeof(struct files_struct) + PGSIZE - 1) / PGSIZE;
   struct files_struct *ret = (struct files_struct *)alloc_pages(pages);
   memset(ret, 0, sizeof *ret);
   // stdin
