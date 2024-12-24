@@ -17,10 +17,12 @@ static uint64_t min(uint64_t a, uint64_t b) { return a < b ? a : b; }
 extern char _sramdisk[];
 extern char _eramdisk[];
 void do_page_fault(struct pt_regs *regs) {
+  // get bad address
   uint64_t bad_addr = csr_read(stval);
   Log("page fault at 0x%lx, sepc = 0x%lx", bad_addr, regs->sepc);
   struct vm_area_struct *vma = find_vma(&current->mm, bad_addr);
   if (vma == NULL) {
+    // VM area not found (should not reach here)
     Err("page fault at 0x%lx, but cannot find the vma, current task's pid is "
         "%lx",
         bad_addr, current->pid);
@@ -28,17 +30,21 @@ void do_page_fault(struct pt_regs *regs) {
   }
   uint64_t scause = csr_read(scause);
   if (scause == INST_PAGE_FAULT && (vma->vm_flags & VM_EXEC) == 0) {
+    // instruction page fault but the vma is not executable
     Err("instruction page fault at 0x%lx, but the vma is not executable",
         bad_addr);
     return;
   } else if (scause == LOAD_PAGE_FAULT && (vma->vm_flags & VM_READ) == 0) {
+    // load page fault but the vma is not readable
     Err("load page fault at 0x%lx, but the vma is not readable", bad_addr);
     return;
   } else if (scause == STORE_PAGE_FAULT && (vma->vm_flags & VM_WRITE) == 0) {
+    // store page fault but the vma is not writable
     Err("store page fault at 0x%lx, but the vma is not writable", bad_addr);
     return;
   }
 
+  // read priviledges
   uint64_t priv_r = (vma->vm_flags & VM_READ) ? PRIV_R : 0;
   uint64_t priv_w = (vma->vm_flags & VM_WRITE) ? PRIV_W : 0;
   uint64_t priv_x = (vma->vm_flags & VM_EXEC) ? PRIV_X : 0;
