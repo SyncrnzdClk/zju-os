@@ -15,7 +15,6 @@ struct files_struct *file_init() {
   ret->fd_array[0] = (struct file){
       .opened = 1,
       .perms = FILE_READABLE,
-      .cfo = 0,
       .lseek = NULL,
       .write = NULL,
       .read = stdin_read,
@@ -24,7 +23,6 @@ struct files_struct *file_init() {
   ret->fd_array[1] = (struct file){
       .opened = 1,
       .perms = FILE_WRITABLE,
-      .cfo = 0,
       .lseek = NULL,
       .write = stdout_write,
       .read = NULL,
@@ -33,7 +31,6 @@ struct files_struct *file_init() {
   ret->fd_array[2] = (struct file){
       .opened = 1,
       .perms = FILE_WRITABLE,
-      .cfo = 0,
       .lseek = NULL,
       .write = stderr_write,
       .read = NULL,
