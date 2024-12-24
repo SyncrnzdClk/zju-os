@@ -139,6 +139,60 @@ void check_and_copy_pages(uint64_t *pgd, uint64_t va_start, uint64_t va_end, uin
     return _task->pid;
 ```
 
+== COW实现
+首先把原来子进程复制父进程页表中已经分配的页面的逻辑改成给引用的page的计数+1，但是不进行`memcpy`的操作，这里要注意的是，传给`get_page`的地址是内核态的虚拟地址，所以需要把用户态的虚拟地址通过页表查询出对应的物理页，然后得到再通过`PA2VA`转化为内核态的虚拟地址，然后传给`get_page`
+```c
+    // check and copy pages
+    if (pgd[vpn2] & PRIV_V) {
+      uint64_t *pgtbl1 = get_pgtable(pgd, vpn2);
+      // check if the second page table entry is valid
+      if (pgtbl1[vpn1] & PRIV_V) {
+        uint64_t *pgtbl0 = get_pgtable(pgtbl1, vpn1);
+        // check if the third page table entry is valid
+        if (pgtbl0[vpn0] & PRIV_V) {
+          // icnrease the page count of the referenced page
+          uint64_t test = (pgtbl0[vpn0] & ~((1 << 10) - 1)) << 2;
+          get_page((uint64_t *)PA2VA(test));
+          // set the PTE_W of the parent process as 0
+          pgtbl0[vpn0] &= ~PRIV_W;
+          uint64_t priv_r = (vm_flags & VM_READ) ? PRIV_R : 0;
+          uint64_t priv_x = (vm_flags & VM_EXEC) ? PRIV_X : 0;
+          create_mapping(new_pgd, va,
+                         (uint64_t)((pgtbl0[vpn0] & ~((1 << 10) - 1)) << 2),
+                         PGSIZE, PRIV_U | priv_r | priv_x | PRIV_V);
+```
+然后在`trap.c`的`do_page_fault`中再增加一段逻辑处理COW，具体逻辑是alloc一个新的page，然后把原来pgtbl中记录的page的计数减一，并且需要先把pgtbl原来的页表项先给置为Invalid（否则在create_mapping中不会创建新的映射），然后create_mapping就可以了。
+```c
+  if (priv_w) {
+    // get the pgtbl entry
+    uint64_t vpn0 = (bad_addr >> 12) & 0x1ff;
+    uint64_t vpn1 = (bad_addr >> 21) & 0x1ff;
+    uint64_t vpn2 = (bad_addr >> 30) & 0x1ff;
+    uint64_t *pgtbl1 = get_pgtable(current->pgd, vpn2);
+    uint64_t *pgtbl0 = get_pgtable(pgtbl1, vpn1);
+    // check if the entry is valid but not writable. if yes, do the cow
+    if ((pgtbl0[vpn0] & PRIV_V) && !(pgtbl0[vpn0] & PRIV_W)) {
+      // create a new page
+      uint64_t *page = alloc_page();
+      // copy the content of the page
+      uint64_t pa = (pgtbl0[vpn0] & ~((1 << 10) - 1)) << 2;
+      memcpy(page, (void *)PA2VA(pa), PGSIZE);
+      // decrease the page count
+      put_page((void *)PA2VA(pa));
+      // before create mapping, set the old page table entry's valid bit as 0
+      pgtbl0[vpn0] &= ~PRIV_V;
+      // create a new mapping
+      create_mapping(current->pgd, (uint64_t)PGROUNDDOWN(bad_addr),
+                     VA2PA((uint64_t)page), PGSIZE,
+                     PRIV_U | priv_r | priv_w | priv_x | PRIV_V);
+      Log("cow page fault at 0x%lx, create a new page at 0x%lx", bad_addr,
+          VA2PA((uint64_t)page));
+      return;
+    }
+  }
+```
+
+
 == 运行结果
 运行`make run TEST=FORK1`
 #figure(image("images/fork1.png"), caption: ["fork1"])
