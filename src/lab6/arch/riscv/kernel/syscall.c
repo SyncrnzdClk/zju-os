@@ -130,9 +130,8 @@ int64_t sys_write(uint64_t fd, const char *buf, uint64_t len) {
   } else {
     // check perm and call write function of file
     if (!(file->perms & FILE_WRITABLE)) {
-      Err("write into a file that is not writable");
+      Err("attempt writing into a non-writable file");
     }
-    // call write function of file
     ret = file->write(file, buf, len);
   }
   return ret;
