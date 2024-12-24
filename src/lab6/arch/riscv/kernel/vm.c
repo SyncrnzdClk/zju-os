@@ -58,9 +58,9 @@ void setup_vm_final() {
       swapper_pg_dir, (uint64_t)&_sdata, (uint64_t)&_sdata - PA2VA_OFFSET,
       PHY_END - ((uint64_t)&_sdata - PA2VA_OFFSET), PRIV_W | PRIV_R | PRIV_V);
 
-  create_mapping(
-      swapper_pg_dir, io_to_virt(VIRTIO_START), VIRTIO_START, 
-      VIRTIO_SIZE * VIRTIO_COUNT, PRIV_W | PRIV_R | PRIV_V);
+  // create_mapping(
+  //     swapper_pg_dir, io_to_virt(VIRTIO_START), VIRTIO_START,
+  //     VIRTIO_SIZE * VIRTIO_COUNT, PRIV_W | PRIV_R | PRIV_V);
 
   // set satp with swapper_pg_dir
 

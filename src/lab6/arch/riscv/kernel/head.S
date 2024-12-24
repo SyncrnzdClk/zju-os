@@ -30,10 +30,10 @@ _start:
     call task_init
 
     # init the virtio
-    call virtio_dev_init
+    # call virtio_dev_init
 
     # init mbr
-    call mbr_init
+    # call mbr_init
 
     # set stvec = _traps
     la t0, _traps
