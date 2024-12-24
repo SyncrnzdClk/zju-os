@@ -57,10 +57,9 @@ void do_page_fault(struct pt_regs *regs) {
       // create a new page
       uint64_t *page = alloc_page();
       // copy the content of the page
-      uint64_t pgtbl_res = ((pgtbl0[vpn0] >> 10) << 12);
-      memcpy(page, (uint64_t *)PA2VA(pgtbl_res), PGSIZE);
-      // decrease the page count
       uint64_t pa = (pgtbl0[vpn0] & ~((1 << 10) - 1)) << 2;
+      memcpy(page, (void *)PA2VA(pa), PGSIZE);
+      // decrease the page count
       put_page((void *)PA2VA(pa));
       // before create mapping, set the old page table entry's valid bit as 0
       pgtbl0[vpn0] &= ~PRIV_V;
