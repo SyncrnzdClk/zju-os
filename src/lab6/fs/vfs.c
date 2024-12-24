@@ -34,5 +34,10 @@ int64_t stdout_write(struct file *file, const void *buf, uint64_t len) {
 }
 
 int64_t stderr_write(struct file *file, const void *buf, uint64_t len) {
-  // todo
+  char to_print[len + 1];
+  for (int i = 0; i < len; i++) {
+    to_print[i] = ((const char *)buf)[i];
+  }
+  to_print[len] = 0;
+  return printk(RED "%s" CLEAR, to_print);
 }

@@ -6,19 +6,13 @@
 #include "vfs.h"
 
 struct files_struct *file_init() {
-  // alloc pages for file struct
-  struct files_struct *ret = NULL;
+  // alloc pages for ret
   uint64_t files_struct_size = sizeof(struct files_struct);
   uint64_t pages = (files_struct_size + PGSIZE - 1) / PGSIZE;
-  struct files_struct *files_struct_space =
-      (struct files_struct *)alloc_pages(pages);
-  if (files_struct_space == NULL) {
-    printk(RED "Failed to alloc pages for files_struct\n" CLEAR);
-    return NULL;
-  }
-  memset(files_struct_space, 0, files_struct_size);
+  struct files_struct *ret = (struct files_struct *)alloc_pages(pages);
+  memset(ret, 0, sizeof *ret);
   // stdin
-  files_struct_space->fd_array[0] = (struct file){
+  ret->fd_array[0] = (struct file){
       .opened = 1,
       .perms = FILE_READABLE,
       .cfo = 0,
@@ -27,7 +21,7 @@ struct files_struct *file_init() {
       .read = stdin_read,
   };
   // stdout
-  files_struct_space->fd_array[1] = (struct file){
+  ret->fd_array[1] = (struct file){
       .opened = 1,
       .perms = FILE_WRITABLE,
       .cfo = 0,
@@ -36,7 +30,7 @@ struct files_struct *file_init() {
       .read = NULL,
   };
   // stderr
-  files_struct_space->fd_array[2] = (struct file){
+  ret->fd_array[2] = (struct file){
       .opened = 1,
       .perms = FILE_WRITABLE,
       .cfo = 0,
@@ -44,7 +38,6 @@ struct files_struct *file_init() {
       .write = stderr_write,
       .read = NULL,
   };
-  ret = files_struct_space;
   return ret;
 }
 
